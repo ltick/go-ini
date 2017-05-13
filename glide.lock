@@ -1,0 +1,8 @@
+hash: 9d09f1bc1c7c2041976adf60d70b033262a8c78f8626a06a4730f105a85d63d4
+updated: 2017-05-14T01:47:49.81838357+08:00
+imports: []
+testImports:
+- name: github.com/ltick/tick-config
+  version: 79987ef58c7497965b73fb2237cf28af702dd56d
+  subpackages:
+  - ini

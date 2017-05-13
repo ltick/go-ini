@@ -1,0 +1,18 @@
+hash: 203f29ddc33c1cf147a67cfcbf894603876c8b98d443a799083cb75d1f9b1a15
+updated: 2017-05-14T01:12:00.280815375+08:00
+imports:
+- name: github.com/BurntSushi/toml
+  version: b26d9c308763d68093482582cea63d69be07a0f0
+- name: github.com/go-ozzo/ozzo-config
+  version: 0ff174cf5aa6480026e0b40c14fd9cfb61c4abf6
+- name: github.com/hnakamur/jsonpreprocess
+  version: 52b0ec7943c0e891039cd505fc3b642f750d453c
+- name: github.com/samuel/go-zookeeper
+  version: 1d7be4effb13d2d908342d349d71a284a7542693
+  subpackages:
+  - zk
+- name: gopkg.in/ini.v1
+  version: e7fea39b01aea8d5671f6858f0532f56e8bff3a5
+- name: gopkg.in/yaml.v2
+  version: cd8b52f8269e0feb286dfeef29f8fe4d5b397e0b
+testImports: []

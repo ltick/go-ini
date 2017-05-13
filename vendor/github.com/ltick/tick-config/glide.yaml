@@ -1,0 +1,3 @@
+package: github.com/ltick/tick-config
+import:
+- package: github.com/go-ozzo/ozzo-config
