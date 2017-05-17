@@ -4,7 +4,8 @@ import (
 	"errors"
 	"reflect"
 	"testing"
-    "tick-config-ini"
+	"tick-config-ini"
+    "fmt"
 )
 
 var failingErr = errors.New("failingErr")
@@ -316,6 +317,20 @@ func TestUnmarshal(t *testing.T) {
 			if *value.(*string) != item.value {
 				t.Error("TestUnmarshal Failed")
 			}
+		} else if typ.Kind() == reflect.Map {
+            for mapKey, mapValue := range *(value.(*map[string]string)) {
+                fmt.Println(mapKey)
+                fmt.Println(mapValue)
+            }
+            /*
+			mapValues := value.(map[string]string)
+			for mapKey, mapValue := range mapValues {
+    
+				if *value.(*map[string]interface{}) != mapValue.(string) {
+					t.Error("TestUnmarshal Failed")
+				}
+			}
+        */
 		} else {
 			if value != item.value {
 				t.Error("TestUnmarshal Failed")
