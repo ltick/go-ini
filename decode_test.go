@@ -2,11 +2,9 @@ package ini_test
 
 import (
 	"errors"
-	"github.com/ltick/tick-config/ini"
-	//"math"
-	"fmt"
 	"reflect"
 	"testing"
+    "tick-config-ini"
 )
 
 var failingErr = errors.New("failingErr")
@@ -23,11 +21,11 @@ var unmarshalTests = []struct {
 	}, {
 		"{}",
 		&struct{}{},
-		/*
-			}, {
+    }, {
 				"v= hi",
 				map[string]string{"v": "hi"},
-			}, {
+    }, {
+        /*
 				"v= hi",
 				map[string]interface{}{"v": "hi"},
 			}, {
@@ -311,7 +309,6 @@ func TestUnmarshal(t *testing.T) {
 			t.Fatalf("missing case for %s", typ)
 		}
 		err := ini.Unmarshal([]byte(item.data), value)
-		fmt.Println(err)
 		if err != nil {
 			t.Error("TestUnmarshal Failed")
 		}

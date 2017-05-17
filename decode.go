@@ -40,9 +40,9 @@ func newParser(b []byte) *parser {
 	ini_parser_set_input_string(&p.parser, []byte{})
 
 	p.skip()
-	fmt.Println("skip")
+
 	if p.event.typ != ini_STREAM_START_EVENT {
-		panic("expected document start event, got " + strconv.Itoa(int(p.event.typ)))
+		panic("expected stream start event, got " + strconv.Itoa(int(p.event.typ)))
 	}
 	p.skip()
 	return &p
@@ -62,6 +62,7 @@ func (p *parser) skip() {
 		}
 		ini_event_delete(&p.event)
 	}
+
 	if !ini_parser_parse(&p.parser, &p.event) {
 		p.fail()
 	}
@@ -95,10 +96,12 @@ func (p *parser) parse() *node {
 		return p.section()
 	case ini_COMMENT_EVENT:
 		return p.comment()
+    case ini_STREAM_END_EVENT:
+        // Happens when attempting to decode an empty buffer.
+        return nil
 	default:
 		panic("attempted to parse unknown event: " + strconv.Itoa(int(p.event.typ)))
 	}
-	panic("unreachable")
 }
 
 func (p *parser) node(kind int) *node {
@@ -232,6 +235,7 @@ func (d *decoder) prepare(n *node, out reflect.Value) (newout reflect.Value, unm
 }
 
 func (d *decoder) unmarshal(n *node, out reflect.Value) (good bool) {
+	fmt.Println("kind:")
 	fmt.Println(n.kind)
 	switch n.kind {
 	case documentNode:

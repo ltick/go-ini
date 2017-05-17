@@ -61,11 +61,10 @@ func GetDefaultSection() string {
 func Unmarshal(in []byte, out interface{}) (err error) {
 	defer handleErr(&err)
 	d := newDecoder()
-	fmt.Println(d)
 	p := newParser(in)
-	fmt.Println(p)
 	defer p.destroy()
 	node := p.parse()
+	fmt.Println(node)
 	if node != nil {
 		v := reflect.ValueOf(out)
 		if v.Kind() == reflect.Ptr && !v.IsNil() {

@@ -38,6 +38,7 @@ const (
 type ini_mark_t struct {
 	index int // The position index.
 	line  int // The position line.
+    column int // The position column.
 }
 
 // Node Styles
@@ -51,7 +52,8 @@ const (
 	// Let the emitter choose the style.
 	ini_ANY_SCALAR_STYLE ini_scalar_style_t = iota
 
-	ini_LITERAL_SCALAR_STYLE       // The literal scalar style.
+    ini_PLAIN_SCALAR_STYLE       // The literal scalar style.
+    ini_LITERAL_SCALAR_STYLE       // The literal scalar style.
 	ini_SINGLE_QUOTED_SCALAR_STYLE // The single-quoted scalar style.
 	ini_DOUBLE_QUOTED_SCALAR_STYLE // The double-quoted scalar style.
 )
@@ -236,6 +238,7 @@ const (
 
 	ini_PARSE_DOCUMENT_START_STATE      // Expect DOCUMENT-START.
 	ini_PARSE_DOCUMENT_END_STATE        // Expect DOCUMENT-END.
+    ini_PARSE_DOCUMENT_CONTENT_STATE    // Expect DOCUMENT-CONTENT.
 	ini_PARSE_SECTION_FIRST_ENTRY_STATE // Expect SECTION-ENTRY.
 	ini_PARSE_SECTION_ENTRY_STATE       // Expect SECTION-ENTRY.
 	ini_PARSE_COMMENT_START_STATE       // Expect COMMENT-START.
@@ -254,6 +257,8 @@ func (ps ini_parser_state_t) String() string {
 		return "ini_PARSE_DOCUMENT_END_STATE"
 	case ini_PARSE_DOCUMENT_START_STATE:
 		return "ini_PARSE_DOCUMENT_START_STATE"
+    case ini_PARSE_DOCUMENT_CONTENT_STATE:
+        return "ini_PARSE_DOCUMENT_CONTENT_STATE"
 	case ini_PARSE_DOCUMENT_END_STATE:
 		return "ini_PARSE_DOCUMENT_END_STATE"
 	case ini_PARSE_SECTION_ENTRY_STATE:
@@ -279,7 +284,6 @@ func (ps ini_parser_state_t) String() string {
 type ini_parser_t struct {
 
 	// Error handling
-
 	error ini_error_type_t // Error type.
 
 	problem string // Error description.
@@ -294,7 +298,6 @@ type ini_parser_t struct {
 	context_mark ini_mark_t
 
 	// Reader stuff
-
 	read_handler ini_read_handler_t // Read handler.
 
 	input_file io.Reader // File input data.
@@ -317,9 +320,8 @@ type ini_parser_t struct {
 	level int // The current flow level.
 
 	// Scanner stuff
-
-	produced_start bool // Have we started to scan the input stream?
-	produced_end   bool // Have we reached the end of the input stream?
+	stream_start_produced bool // Have we started to scan the input stream?
+	stream_end_produced   bool // Have we reached the end of the input stream?
 
 	tokens          []ini_token_t // The tokens queue.
 	tokens_head     int           // The head of the tokens queue.
@@ -327,7 +329,6 @@ type ini_parser_t struct {
 	token_available bool          // Does the tokens queue contain a token ready for dequeueing.
 
 	// Parser stuff
-
 	state  ini_parser_state_t   // The current parser state.
 	states []ini_parser_state_t // The parser states stack.
 	marks  []ini_mark_t         // The stack of marks.

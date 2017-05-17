@@ -299,11 +299,55 @@ func trace(args ...interface{}) func() {
 	return func() { fmt.Println(pargs...) }
 }
 
+// Initialize the scanner and produce the STREAM-START token.
+func ini_parser_fetch_stream_start(parser *ini_parser_t) bool {
+
+	// We have started.
+	parser.stream_start_produced = true
+
+	// Create the STREAM-START token and append it to the queue.
+	token := ini_token_t{
+		typ:        ini_STREAM_START_TOKEN,
+		start_mark: parser.mark,
+		end_mark:   parser.mark,
+	}
+	ini_insert_token(parser, -1, &token)
+	return true
+}
+
+// Produce the STREAM-END token and shut down the scanner.
+func ini_parser_fetch_stream_end(parser *ini_parser_t) bool {
+    // Force new line.
+    if parser.mark.column != 0 {
+        parser.mark.column = 0
+        parser.mark.line++
+    }
+	// Create the STREAM-END token and append it to the queue.
+	token := ini_token_t{
+		typ:        ini_STREAM_END_TOKEN,
+		start_mark: parser.mark,
+		end_mark:   parser.mark,
+	}
+	ini_insert_token(parser, -1, &token)
+	return true
+}
+
 // Ensure that the tokens queue contains at least one token which can be
 // returned to the Parser.
 func ini_parser_fetch_more_tokens(parser *ini_parser_t) bool {
 	// While we need more tokens to fetch, do it.
 	for {
+        // Check if we really need to fetch more tokens.
+        need_more_tokens := false
+
+        if parser.tokens_head == len(parser.tokens) {
+            // Queue is empty.
+            need_more_tokens = true
+        }
+        // We are finished.
+        if !need_more_tokens {
+            break
+        }
 		// Fetch the next token.
 		if !ini_parser_fetch_next_token(parser) {
 			return false
@@ -317,13 +361,12 @@ func ini_parser_fetch_more_tokens(parser *ini_parser_t) bool {
 // The dispatcher for token fetchers.
 func ini_parser_fetch_next_token(parser *ini_parser_t) bool {
 	// Ensure that the buffer is initialized.
-	// if parser.unread < 1 && !ini_parser_update_buffer(parser, 1) {
-	// return false
-	//}
+	if parser.unread < 1 && !ini_parser_update_buffer(parser, 1) {
+        return false
+	}
 	// Check if we just started scanning.  Fetch STREAM-START then.
-	if !parser.produced_start {
-		ini_parser_fetch_document_indicator(parser, ini_DOCUMENT_START_TOKEN)
-		return true
+	if !parser.stream_start_produced {
+		return ini_parser_fetch_stream_start(parser)
 	}
 
 	// Eat whitespaces and comments until we reach the next token.
@@ -331,17 +374,25 @@ func ini_parser_fetch_next_token(parser *ini_parser_t) bool {
 		return false
 	}
 
-	// Is it the end of the document?
+	// Is it the end of the stream?
 	if is_z(parser.buffer, parser.buffer_pos) {
-		ini_parser_fetch_document_indicator(parser, ini_DOCUMENT_END_TOKEN)
-		return false
+		return ini_parser_fetch_stream_end(parser)
 	}
 
 	buf := parser.buffer
 	pos := parser.buffer_pos
+    // Is it the document start indicator?
+    if parser.mark.line == 0 && parser.mark.column == 0 {
+        return ini_parser_fetch_document_indicator(parser, ini_DOCUMENT_START_TOKEN)
+    }
+
+    // Is it the document end indicator?
+    if parser.eof {
+        return ini_parser_fetch_document_indicator(parser, ini_DOCUMENT_END_TOKEN)
+    }
 
 	// Is it the section start indicator?
-	if buf[pos] == '[' {
+	if parser.mark.column == 0 && buf[pos] == '[' {
 		return ini_parser_fetch_section(parser, ini_SECTION_START_TOKEN)
 	}
 
@@ -416,13 +467,6 @@ func ini_parser_fetch_section(parser *ini_parser_t, typ ini_token_type_t) bool {
 
 // Produce the DOCUMENT-START or DOCUMENT-END token.
 func ini_parser_fetch_document_indicator(parser *ini_parser_t, typ ini_token_type_t) bool {
-	switch typ {
-	case ini_DOCUMENT_START_TOKEN:
-		parser.produced_start = true
-	case ini_DOCUMENT_END_TOKEN:
-		parser.produced_end = true
-	}
-
 	// Create the DOCUMENT-START or DOCUMENT-END token.
 	token := ini_token_t{
 		typ:        typ,

@@ -1,10 +1,10 @@
 package ini_test
 
 import (
-	"github.com/ltick/tick-config/ini"
 	//"math"
 	"os"
 	"testing"
+	"tick-config-ini"
 )
 
 var marshalTests = []struct {
