@@ -21,13 +21,13 @@ func newEncoder() (e *encoder) {
 	e.must(ini_emitter_initialize(&e.emitter))
 	ini_emitter_set_output_string(&e.emitter, &e.out)
 	ini_emitter_set_unicode(&e.emitter, true)
-	e.must(ini_document_start_event_initialize(&e.event))
+	e.must(ini_document_event_initialize(&e.event))
 	e.emit()
 	return e
 }
 
 func (e *encoder) finish() {
-	e.must(ini_document_end_event_initialize(&e.event))
+	e.must(ini_document_event_initialize(&e.event))
 	e.emit()
 	e.emitter.open_ended = false
 }
@@ -187,6 +187,6 @@ func (e *encoder) nilv() {
 }
 
 func (e *encoder) emitNode(value string, style ini_scalar_style_t) {
-	e.must(ini_node_event_initialize(&e.event, []byte(value), true, style))
+	e.must(ini_element_event_initialize(&e.event, []byte(value), style))
 	e.emit()
 }

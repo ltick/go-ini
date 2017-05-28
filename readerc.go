@@ -81,7 +81,6 @@ func ini_parser_update_buffer(parser *ini_parser_t, length int) bool {
 
 	// Open the whole buffer for writing, and cut it before returning.
 	parser.buffer = parser.buffer[:cap(parser.buffer)]
-
 	// Fill the buffer until it has enough characters.
 	first := true
 	for parser.unread < length {

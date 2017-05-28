@@ -36,9 +36,9 @@ const (
 
 // The pointer position.
 type ini_mark_t struct {
-	index int // The position index.
-	line  int // The position line.
-    column int // The position column.
+	index  int // The position index.
+	line   int // The position line.
+	column int // The position column.
 }
 
 // Node Styles
@@ -52,8 +52,8 @@ const (
 	// Let the emitter choose the style.
 	ini_ANY_SCALAR_STYLE ini_scalar_style_t = iota
 
-    ini_PLAIN_SCALAR_STYLE       // The literal scalar style.
-    ini_LITERAL_SCALAR_STYLE       // The literal scalar style.
+	ini_PLAIN_SCALAR_STYLE         // The plain scalar style.
+	ini_LITERAL_SCALAR_STYLE       // The literal scalar style.
 	ini_SINGLE_QUOTED_SCALAR_STYLE // The single-quoted scalar style.
 	ini_DOUBLE_QUOTED_SCALAR_STYLE // The double-quoted scalar style.
 )
@@ -67,17 +67,14 @@ const (
 	// An empty token.
 	ini_NO_TOKEN ini_token_type_t = iota
 
-	ini_STREAM_START_TOKEN   // A DOCUMENT-START token.
-	ini_STREAM_END_TOKEN     // A DOCUMENT-START token.
 	ini_DOCUMENT_START_TOKEN // A DOCUMENT-START token.
-	ini_DOCUMENT_END_TOKEN   // A DOCUMENT-END token.
+	ini_DOCUMENT_END_TOKEN   // A DOCUMENT-START token.
 
 	ini_SECTION_START_TOKEN   // A SECTION-START token.
+	ini_SECTION_INHERIT_TOKEN // A SECTION INHERIT token.
 	ini_SECTION_END_TOKEN     // A SECTION-END token.
-	ini_SECTION_INHERIT_TOKEN // A SECTION-INHERIT token.
 
-	ini_KEY_TOKEN   // An NODE KEY token.
-	ini_VALUE_TOKEN // An NODE VALUE token.
+	ini_VALUE_TOKEN // An VALUE token.
 
 	ini_COMMENT_START_TOKEN // A COMMENT-START token.
 	ini_COMMENT_END_TOKEN   // A COMMENT-END token.
@@ -87,10 +84,6 @@ func (tt ini_token_type_t) String() string {
 	switch tt {
 	case ini_NO_TOKEN:
 		return "ini_NO_TOKEN"
-	case ini_STREAM_START_TOKEN:
-		return "ini_STREAM_START_TOKEN"
-	case ini_STREAM_END_TOKEN:
-		return "ini_STREAM_END_TOKEN"
 	case ini_DOCUMENT_START_TOKEN:
 		return "ini_DOCUMENT_START_TOKEN"
 	case ini_DOCUMENT_END_TOKEN:
@@ -101,8 +94,6 @@ func (tt ini_token_type_t) String() string {
 		return "ini_SECTION_END_TOKEN"
 	case ini_SECTION_INHERIT_TOKEN:
 		return "ini_SECTION_INHERIT_TOKEN"
-	case ini_KEY_TOKEN:
-		return "ini_KEY_TOKEN"
 	case ini_VALUE_TOKEN:
 		return "ini_VALUE_TOKEN"
 	case ini_COMMENT_START_TOKEN:
@@ -125,7 +116,7 @@ type ini_token_t struct {
 	// (for ini_SCALAR_TOKEN).
 	value []byte
 
-	// The scalar style (for ini_VALUE_TOKEN).
+	// The scalar style (for ini_SCALAR_TOKEN).
 	style ini_scalar_style_t
 }
 
@@ -138,18 +129,16 @@ const (
 	// An empty event.
 	ini_NO_EVENT ini_event_type_t = iota
 
-	ini_STREAM_START_EVENT    // A STREAM-START event.
-	ini_STREAM_END_EVENT      // A STREAM-END event.
 	ini_DOCUMENT_START_EVENT  // A DOCUMENT-START event.
 	ini_DOCUMENT_END_EVENT    // A DOCUMENT-END event.
+	ini_SECTION_ENTRY_EVENT   // A SECTION-ENTRY event.
+	ini_SECTION_INHERIT_EVENT // A SECTION-ENTRY event.
 	ini_SECTION_START_EVENT   // A SECTION-START event.
-	ini_SECTION_INHERIT_EVENT // A INHERIT SECTION event.
-	ini_SECTION_END_EVENT     // A SECTION-END event.
 
-	ini_SCALAR_EVENT  // An SCALAR event.
-	ini_KEY_EVENT     // An KEY event.
-	ini_VALUE_EVENT   // An VALUE event.
-	ini_COMMENT_EVENT // A COMMENT event.
+	ini_ELEMENT_KEY_EVENT   // An ELEMENT event.
+	ini_ELEMENT_VALUE_EVENT // An ELEMENT event.
+	ini_COMMENT_START_EVENT // A COMMENT event.
+	ini_COMMENT_END_EVENT   // A COMMENT event.
 )
 
 // The event structure.
@@ -161,53 +150,54 @@ type ini_event_t struct {
 	// The start and end of the event.
 	start_mark, end_mark ini_mark_t
 
-	// The node value (for ini_NODE_EVENT).
+	// The node value.
 	value []byte
 
-	// for ini_NODE_EVENT.
-	implicit bool
+	// for ini_SECTION_INHERIT_EVENT.
+	inherit []byte
 
-	// The style (for ini_NODE_EVENT).
+	// The style (for ini_ELEMENT_START_EVENT).
 	style ini_style_t
 }
 
 func (e *ini_event_t) scalar_style() ini_scalar_style_t { return ini_scalar_style_t(e.style) }
 
-type ini_node_type_t int
+type ini_section_type_t int
 
-// Node types.
 const (
 	// An empty node.
-	ini_NO_NODE ini_node_type_t = iota
+	ini_DEFAULT_SECTION ini_section_type_t = iota
 
-	ini_ITEM_KEY_NODE   // A item key node.
-	ini_ITEM_VALUE_NODE // A item value node.
-	ini_COMMENT_NODE    // A comment node.
+	ini_SINGLE_SECTION
+	ini_INHERIT_SECTION
 )
 
 // The node structure.
-type ini_node_t struct {
-	typ ini_node_type_t // The node type.
+type ini_section_t struct {
+	typ ini_section_type_t // The node type.
+
+	value  []byte // The section value.
+	length int    // The length of the section value.
+
+	inherit []byte // The inherit section value.
 
 	// The node data.
-
-	// The scalar parameters (for ini_SCALAR_NODE).
-	scalar struct {
-		value  []byte             // The scalar value.
-		length int                // The length of the scalar value.
-		style  ini_scalar_style_t // The scalar style.
-	}
+	items []ini_item_t
 
 	start_mark ini_mark_t // The beginning of the node.
 	end_mark   ini_mark_t // The end of the node.
+}
 
+type ini_item_t struct {
+	key   []byte // The key.
+	value []byte // The value.
 }
 
 // The document structure.
 type ini_document_t struct {
 
-	// The document nodes.
-	nodes []ini_node_t
+	// The document sections.
+	sections []ini_section_t
 
 	// The start/end of the document.
 	start_mark, end_mark ini_mark_t
@@ -234,45 +224,45 @@ type ini_read_handler_t func(parser *ini_parser_t, buffer []byte) (n int, err er
 type ini_parser_state_t int
 
 const (
-	ini_PARSE_STREAM_START_STATE ini_parser_state_t = iota // Expect START.
+	ini_PARSE_DOCUMENT_START_STATE ini_parser_state_t = iota // Expect START.
 
-	ini_PARSE_DOCUMENT_START_STATE      // Expect DOCUMENT-START.
-	ini_PARSE_DOCUMENT_END_STATE        // Expect DOCUMENT-END.
-    ini_PARSE_DOCUMENT_CONTENT_STATE    // Expect DOCUMENT-CONTENT.
-	ini_PARSE_SECTION_FIRST_ENTRY_STATE // Expect SECTION-ENTRY.
+	ini_PARSE_DOCUMENT_END_STATE        // Expect DOCUMENT-START.
+	ini_PARSE_SECTION_FIRST_ENTRY_STATE // Expect SECTION-FIRST-ENTRY.
 	ini_PARSE_SECTION_ENTRY_STATE       // Expect SECTION-ENTRY.
+	ini_PARSE_SECTION_INHERIT_STATE     // Expect SECTION-INHERIT.
+	ini_PARSE_SECTION_START_STATE       // Expect SECTION-START.
+	ini_PARSE_SECTION_END_STATE         // Expect SECTION-END.
+	ini_PARSE_ELEMENT_KEY_STATE         // Expect a ELEMENT-KEY.
+	ini_PARSE_ELEMENT_VALUE_STATE       // Expect a ELEMENT-VALUE.
 	ini_PARSE_COMMENT_START_STATE       // Expect COMMENT-START.
 	ini_PARSE_COMMENT_CONTENT_STATE     // Expect the content of a comment.
 	ini_PARSE_COMMENT_END_STATE         // Expect COMMENT-END.
-	ini_PARSE_KEY_STATE                 // Expect a node key.
-	ini_PARSE_VALUE_STATE               // Expect a node value.
-	ini_PARSE_STREAM_END_STATE          // Expect END.
 )
 
 func (ps ini_parser_state_t) String() string {
 	switch ps {
-	case ini_PARSE_STREAM_START_STATE:
-		return "ini_PARSE_STREAM_START_STATE"
-	case ini_PARSE_STREAM_END_STATE:
-		return "ini_PARSE_DOCUMENT_END_STATE"
 	case ini_PARSE_DOCUMENT_START_STATE:
 		return "ini_PARSE_DOCUMENT_START_STATE"
-    case ini_PARSE_DOCUMENT_CONTENT_STATE:
-        return "ini_PARSE_DOCUMENT_CONTENT_STATE"
 	case ini_PARSE_DOCUMENT_END_STATE:
 		return "ini_PARSE_DOCUMENT_END_STATE"
+	case ini_PARSE_SECTION_FIRST_ENTRY_STATE:
+		return "ini_PARSE_SECTION_FIRST_ENTRY_STATE"
 	case ini_PARSE_SECTION_ENTRY_STATE:
 		return "ini_PARSE_SECTION_ENTRY_STATE"
+	case ini_PARSE_SECTION_INHERIT_STATE:
+		return "ini_PARSE_SECTION_INHERIT_STATE"
+	case ini_PARSE_SECTION_START_STATE:
+		return "ini_PARSE_SECTION_START_STATE"
+	case ini_PARSE_ELEMENT_KEY_STATE:
+		return "ini_PARSE_ELEMENT_KEY_STATE"
+	case ini_PARSE_ELEMENT_VALUE_STATE:
+		return "ini_PARSE_ELEMENT_VALUE_STATE"
 	case ini_PARSE_COMMENT_START_STATE:
 		return "ini_PARSE_COMMENT_START_STATE"
 	case ini_PARSE_COMMENT_CONTENT_STATE:
 		return "ini_PARSE_COMMENT_CONTENT_STATE"
 	case ini_PARSE_COMMENT_END_STATE:
 		return "ini_PARSE_COMMENT_END_STATE"
-	case ini_PARSE_KEY_STATE:
-		return "ini_PARSE_KEY_STATE"
-	case ini_PARSE_VALUE_STATE:
-		return "ini_PARSE_VALUE_STATE"
 	}
 	return "<unknown parser state>"
 }
@@ -320,8 +310,8 @@ type ini_parser_t struct {
 	level int // The current flow level.
 
 	// Scanner stuff
-	stream_start_produced bool // Have we started to scan the input stream?
-	stream_end_produced   bool // Have we reached the end of the input stream?
+	document_start_produced bool // Have we started to scan the input stream?
+	document_end_produced   bool // Have we reached the end of the input stream?
 
 	tokens          []ini_token_t // The tokens queue.
 	tokens_head     int           // The head of the tokens queue.
@@ -356,22 +346,19 @@ type ini_emitter_state_t int
 
 // The emitter states.
 const (
-	// Expect STREAM-START.
-	ini_EMIT_STREAM_START_STATE ini_emitter_state_t = iota
+	// Expect DOCUMENT-START.
+	ini_EMIT_DOCUMENT_START_STATE ini_emitter_state_t = iota
 
-	ini_EMIT_DOCUMENT_START_STATE         // Expect DOCUMENT-START.
 	ini_EMIT_DOCUMENT_END_STATE           // Expect DOCUMENT-END.
 	ini_EMIT_FIRST_SECTION_START_STATE    // Expect the first section
 	ini_EMIT_SECTION_START_STATE          // Expect the start of section.
 	ini_EMIT_SECTION_FIRST_NODE_KEY_STATE // Expect the start of section.
-	ini_EMIT_SECTION_NODE_KEY_STATE       // Expect the start of section.
-	ini_EMIT_SECTION_NODE_VALUE_STATE     // Expect the node.
+	ini_EMIT_ELEMENT_KEY_STATE            // Expect the start of section.
+	ini_EMIT_ELEMENT_VALUE_STATE          // Expect the node.
 	ini_EMIT_SECTION_END_STATE            // Expect the end of section.
 	ini_EMIT_COMMENT_START_STATE          // Expect the start of section.
 	ini_EMIT_COMMENT_VALUE_STATE          // Expect the content of section.
 	ini_EMIT_COMMENT_END_STATE            // Expect the end of section.
-	ini_EMIT_STREAM_END_STATE             // Expect the end of section.
-
 )
 
 // The emitter structure.

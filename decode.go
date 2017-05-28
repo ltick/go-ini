@@ -1,7 +1,9 @@
 package ini
 
 import (
+	"encoding"
 	"fmt"
+	"math"
 	"reflect"
 	"strconv"
 	"time"
@@ -11,6 +13,7 @@ const (
 	documentNode = 1 << iota
 	sectionNode
 	commentNode
+	itemNode
 	scalarNode
 )
 
@@ -18,7 +21,6 @@ type node struct {
 	kind         int
 	line, column int
 	value        string
-	implicit     bool
 	children     []*node
 }
 
@@ -37,11 +39,13 @@ func newParser(b []byte) *parser {
 		panic("failed to initialize INI emitter")
 	}
 
-	ini_parser_set_input_string(&p.parser, []byte{})
+	if len(b) == 0 {
+		b = []byte{}
+	}
 
+	ini_parser_set_input_string(&p.parser, b)
 	p.skip()
-
-	if p.event.typ != ini_STREAM_START_EVENT {
+	if p.event.typ != ini_DOCUMENT_START_EVENT {
 		panic("expected stream start event, got " + strconv.Itoa(int(p.event.typ)))
 	}
 	p.skip()
@@ -57,12 +61,11 @@ func (p *parser) destroy() {
 
 func (p *parser) skip() {
 	if p.event.typ != ini_NO_EVENT {
-		if p.event.typ == ini_STREAM_END_EVENT {
+		if p.event.typ == ini_DOCUMENT_END_EVENT {
 			failf("attempted to go past the end of document; corrupted value?")
 		}
 		ini_event_delete(&p.event)
 	}
-
 	if !ini_parser_parse(&p.parser, &p.event) {
 		p.fail()
 	}
@@ -89,16 +92,19 @@ func (p *parser) fail() {
 }
 
 func (p *parser) parse() *node {
+	fmt.Println(p.event.typ)
 	switch p.event.typ {
+	case ini_ELEMENT_KEY_EVENT:
+		return p.element()
 	case ini_DOCUMENT_START_EVENT:
 		return p.document()
-	case ini_SECTION_START_EVENT:
+	case ini_SECTION_ENTRY_EVENT:
 		return p.section()
-	case ini_COMMENT_EVENT:
+	case ini_COMMENT_START_EVENT:
 		return p.comment()
-    case ini_STREAM_END_EVENT:
-        // Happens when attempting to decode an empty buffer.
-        return nil
+	case ini_DOCUMENT_END_EVENT:
+		// Happens when attempting to decode an empty buffer.
+		return nil
 	default:
 		panic("attempted to parse unknown event: " + strconv.Itoa(int(p.event.typ)))
 	}
@@ -106,16 +112,20 @@ func (p *parser) parse() *node {
 
 func (p *parser) node(kind int) *node {
 	return &node{
-		kind: kind,
-		line: p.event.start_mark.line,
+		kind:   kind,
+		line:   p.event.start_mark.line,
+		column: p.event.start_mark.column,
 	}
 }
 
 func (p *parser) document() *node {
+	fmt.Println("document")
 	n := p.node(documentNode)
+	fmt.Println(n)
 	p.doc = n
 	p.skip()
 	n.children = append(n.children, p.parse())
+	fmt.Println(n.children)
 	if p.event.typ != ini_DOCUMENT_END_EVENT {
 		panic("expected end of document event but got " + strconv.Itoa(int(p.event.typ)))
 	}
@@ -125,9 +135,23 @@ func (p *parser) document() *node {
 
 func (p *parser) section() *node {
 	n := p.node(sectionNode)
+	n.value = string(p.event.value)
 	p.skip()
-	for p.event.typ != ini_SECTION_END_EVENT {
-		n.children = append(n.children, p.parse(), p.parse())
+	p.parse()
+	if p.event.typ == ini_SECTION_ENTRY_EVENT {
+		p.skip()
+	} else if p.event.typ == ini_SECTION_INHERIT_EVENT {
+		for i := len(p.doc.children) - 1; i >= 0; i-- {
+			section := p.doc.children[i]
+			if section.value == string(p.event.value) {
+				n.children = section.children
+			}
+		}
+	} else if p.event.typ == ini_SECTION_START_EVENT {
+		p.skip()
+	}
+	for p.event.typ != ini_SECTION_START_EVENT {
+		n.children = append(n.children, p.item())
 	}
 	p.skip()
 	return n
@@ -140,10 +164,16 @@ func (p *parser) comment() *node {
 	return n
 }
 
-func (p *parser) scalar() *node {
+func (p *parser) item() *node {
+	n := p.node(itemNode)
+	n.value = string(p.event.value)
+	p.skip()
+	return n
+}
+
+func (p *parser) element() *node {
 	n := p.node(scalarNode)
 	n.value = string(p.event.value)
-	n.implicit = p.event.implicit
 	p.skip()
 	return n
 }
@@ -235,19 +265,22 @@ func (d *decoder) prepare(n *node, out reflect.Value) (newout reflect.Value, unm
 }
 
 func (d *decoder) unmarshal(n *node, out reflect.Value) (good bool) {
-	fmt.Println("kind:")
-	fmt.Println(n.kind)
 	switch n.kind {
 	case documentNode:
 		return d.document(n, out)
 	}
 	out, unmarshaled, good := d.prepare(n, out)
+	fmt.Println(unmarshaled)
 	if unmarshaled {
 		return good
 	}
+	fmt.Println("kind:")
+	fmt.Println(n.kind)
 	switch n.kind {
 	case sectionNode:
 		good = d.section(n, out)
+	case scalarNode:
+		good = d.element(n, out)
 	default:
 		panic("internal error: unknown node kind: " + strconv.Itoa(n.kind))
 	}
@@ -298,7 +331,7 @@ func (d *decoder) section(n *node, out reflect.Value) (good bool) {
 	j := 0
 	for i := 0; i < l; i++ {
 		e := reflect.New(et).Elem()
-		if ok := d.unmarshal(n.children[i], e); ok {
+		if ok := d.element(n.children[i], e); ok {
 			out.Index(j).Set(e)
 			j++
 		}
@@ -308,6 +341,128 @@ func (d *decoder) section(n *node, out reflect.Value) (good bool) {
 		iface.Set(out)
 	}
 	return true
+}
+
+func (d *decoder) element(n *node, out reflect.Value) (good bool) {
+	var resolved interface{}
+	if resolved == nil {
+		if out.Kind() == reflect.Map && !out.CanAddr() {
+			resetMap(out)
+		} else {
+			out.Set(reflect.Zero(out.Type()))
+		}
+		return true
+	}
+	if s, ok := resolved.(string); ok && out.CanAddr() {
+		if u, ok := out.Addr().Interface().(encoding.TextUnmarshaler); ok {
+			err := u.UnmarshalText([]byte(s))
+			if err != nil {
+				fail(err)
+			}
+			return true
+		}
+	}
+	switch out.Kind() {
+	case reflect.String:
+		if resolved != nil {
+			out.SetString(n.value)
+			good = true
+		}
+	case reflect.Interface:
+		if resolved == nil {
+			out.Set(reflect.Zero(out.Type()))
+		} else {
+			out.Set(reflect.ValueOf(resolved))
+		}
+		good = true
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		switch resolved := resolved.(type) {
+		case int:
+			if !out.OverflowInt(int64(resolved)) {
+				out.SetInt(int64(resolved))
+				good = true
+			}
+		case int64:
+			if !out.OverflowInt(resolved) {
+				out.SetInt(resolved)
+				good = true
+			}
+		case uint64:
+			if resolved <= math.MaxInt64 && !out.OverflowInt(int64(resolved)) {
+				out.SetInt(int64(resolved))
+				good = true
+			}
+		case float64:
+			if resolved <= math.MaxInt64 && !out.OverflowInt(int64(resolved)) {
+				out.SetInt(int64(resolved))
+				good = true
+			}
+		case string:
+			if out.Type() == durationType {
+				d, err := time.ParseDuration(resolved)
+				if err == nil {
+					out.SetInt(int64(d))
+					good = true
+				}
+			}
+		}
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
+		switch resolved := resolved.(type) {
+		case int:
+			if resolved >= 0 && !out.OverflowUint(uint64(resolved)) {
+				out.SetUint(uint64(resolved))
+				good = true
+			}
+		case int64:
+			if resolved >= 0 && !out.OverflowUint(uint64(resolved)) {
+				out.SetUint(uint64(resolved))
+				good = true
+			}
+		case uint64:
+			if !out.OverflowUint(uint64(resolved)) {
+				out.SetUint(uint64(resolved))
+				good = true
+			}
+		case float64:
+			if resolved <= math.MaxUint64 && !out.OverflowUint(uint64(resolved)) {
+				out.SetUint(uint64(resolved))
+				good = true
+			}
+		}
+	case reflect.Bool:
+		switch resolved := resolved.(type) {
+		case bool:
+			out.SetBool(resolved)
+			good = true
+		}
+	case reflect.Float32, reflect.Float64:
+		switch resolved := resolved.(type) {
+		case int:
+			out.SetFloat(float64(resolved))
+			good = true
+		case int64:
+			out.SetFloat(float64(resolved))
+			good = true
+		case uint64:
+			out.SetFloat(float64(resolved))
+			good = true
+		case float64:
+			out.SetFloat(resolved)
+			good = true
+		}
+	case reflect.Ptr:
+		if out.Type().Elem() == reflect.TypeOf(resolved) {
+			// TODO DOes this make sense? When is out a Ptr except when decoding a nil value?
+			elem := reflect.New(out.Type().Elem())
+			elem.Elem().Set(reflect.ValueOf(resolved))
+			out.Set(elem)
+			good = true
+		}
+	}
+	if !good {
+		d.terror(n, out)
+	}
+	return good
 }
 
 func (d *decoder) mapping(n *node, out reflect.Value) (good bool) {
@@ -466,5 +621,5 @@ func (d *decoder) merge(n *node, out reflect.Value) {
 }
 
 func isMerge(n *node) bool {
-	return n.kind == scalarNode && n.implicit == true
+	return n.kind == scalarNode
 }

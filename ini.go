@@ -63,6 +63,7 @@ func Unmarshal(in []byte, out interface{}) (err error) {
 	d := newDecoder()
 	p := newParser(in)
 	defer p.destroy()
+	fmt.Println("node:")
 	node := p.parse()
 	fmt.Println(node)
 	if node != nil {
@@ -384,7 +385,6 @@ func unmarshal(content []byte, data reflect.Value, comment reflect.Value) (err e
 		if !sectionData.IsValid() {
 			data.SetMapIndex(reflect.ValueOf(section), reflect.MakeMap(itemType))
 		}
-		fmt.Println(implementSection)
 		implementSectionData := data.MapIndex(reflect.ValueOf(implementSection))
 		// data[implementSection] exists
 		if implementSectionData.IsValid() {

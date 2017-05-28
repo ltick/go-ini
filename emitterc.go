@@ -140,7 +140,7 @@ func ini_emitter_need_more_events(emitter *ini_emitter_t) bool {
 	case ini_SECTION_START_EVENT:
 		accumulate = 2
 		break
-	case ini_COMMENT_EVENT:
+	case ini_COMMENT_START_EVENT:
 		accumulate = 3
 		break
 	default:
@@ -154,8 +154,6 @@ func ini_emitter_need_more_events(emitter *ini_emitter_t) bool {
 		switch emitter.events[i].typ {
 		case ini_DOCUMENT_START_EVENT, ini_SECTION_START_EVENT:
 			level++
-		case ini_DOCUMENT_END_EVENT, ini_SECTION_END_EVENT:
-			level--
 		}
 		if level == 0 {
 			return false
@@ -168,42 +166,31 @@ func ini_emitter_need_more_events(emitter *ini_emitter_t) bool {
 func ini_emitter_state_machine(emitter *ini_emitter_t, event *ini_event_t) bool {
 	switch emitter.state {
 	default:
-	case ini_EMIT_STREAM_START_STATE:
-		return ini_emitter_emit_start(emitter, event)
 	case ini_EMIT_DOCUMENT_START_STATE:
-		return ini_emitter_emit_document_start(emitter, event)
-
+		return ini_emitter_emit_start(emitter, event)
 	case ini_EMIT_DOCUMENT_END_STATE:
-		return ini_emitter_emit_document_end(emitter, event)
-
+		return ini_emitter_emit_document(emitter, event)
 	case ini_EMIT_FIRST_SECTION_START_STATE:
 		return ini_emitter_emit_section_start(emitter, event, true)
-
 	case ini_EMIT_SECTION_START_STATE:
 		return ini_emitter_emit_section_start(emitter, event, false)
-
 	case ini_EMIT_SECTION_FIRST_NODE_KEY_STATE:
 		return ini_emitter_emit_node(emitter, event)
-
-	case ini_EMIT_SECTION_NODE_KEY_STATE:
+	case ini_EMIT_ELEMENT_KEY_STATE:
 		return ini_emitter_emit_node(emitter, event)
-
-	case ini_EMIT_SECTION_NODE_VALUE_STATE:
+	case ini_EMIT_ELEMENT_VALUE_STATE:
 		return ini_emitter_emit_node(emitter, event)
-
 	case ini_EMIT_SECTION_END_STATE:
 		return ini_emitter_emit_section_end(emitter, event, false)
-
 	case ini_EMIT_COMMENT_START_STATE:
 		return ini_emitter_emit_comment(emitter, event)
-
 	}
 	panic("invalid emitter state")
 }
 
-// Expect STREAM-START.
+// Expect DOCUMENT-START.
 func ini_emitter_emit_start(emitter *ini_emitter_t, event *ini_event_t) bool {
-	if event.typ != ini_STREAM_START_EVENT {
+	if event.typ != ini_DOCUMENT_START_EVENT {
 		return ini_emitter_set_emitter_error(emitter, "expected START")
 	}
 	if emitter.line_break == ini_ANY_BREAK {
@@ -214,11 +201,11 @@ func ini_emitter_emit_start(emitter *ini_emitter_t, event *ini_event_t) bool {
 	emitter.column = 0
 	emitter.whitespace = true
 
-	emitter.state = ini_EMIT_DOCUMENT_START_STATE
+	emitter.state = ini_EMIT_DOCUMENT_END_STATE
 	return true
 }
 
-func ini_emitter_emit_document_start(emitter *ini_emitter_t, event *ini_event_t) bool {
+func ini_emitter_emit_document(emitter *ini_emitter_t, event *ini_event_t) bool {
 	if event.typ != ini_DOCUMENT_START_EVENT {
 		return ini_emitter_set_emitter_error(emitter, "expected DOCUMENT-START")
 	}
@@ -233,24 +220,6 @@ func ini_emitter_emit_document_start(emitter *ini_emitter_t, event *ini_event_t)
 	return true
 }
 
-// Expect DOCUMENT-END.
-func ini_emitter_emit_document_end(emitter *ini_emitter_t, event *ini_event_t) bool {
-	if event.typ != ini_DOCUMENT_END_EVENT {
-		return ini_emitter_set_emitter_error(emitter, "expected DOCUMENT-END")
-	}
-	if !event.implicit {
-		// [Go] Allocate the slice elsewhere.
-		if !ini_emitter_write_indicator(emitter, []byte("..."), true, false) {
-			return false
-		}
-	}
-	if !ini_emitter_flush(emitter) {
-		return false
-	}
-	emitter.state = ini_EMIT_DOCUMENT_END_STATE
-	return true
-}
-
 // Expect a section start.
 func ini_emitter_emit_section_start(emitter *ini_emitter_t, event *ini_event_t, first bool) bool {
 	if first == true {
@@ -261,7 +230,7 @@ func ini_emitter_emit_section_start(emitter *ini_emitter_t, event *ini_event_t, 
 		if !ini_emitter_write_indicator(emitter, []byte{'['}, false, false) {
 			return false
 		}
-		if !ini_emitter_process_scalar(emitter) {
+		if !ini_emitter_process_element(emitter) {
 			return false
 		}
 		if !ini_emitter_write_indicator(emitter, []byte{']'}, false, false) {
@@ -274,16 +243,16 @@ func ini_emitter_emit_section_start(emitter *ini_emitter_t, event *ini_event_t, 
 
 // Expect a section end.
 func ini_emitter_emit_section_end(emitter *ini_emitter_t, event *ini_event_t, first bool) bool {
-	emitter.states = append(emitter.states, ini_EMIT_DOCUMENT_END_STATE)
+	emitter.states = append(emitter.states, ini_EMIT_SECTION_END_STATE)
 	return ini_emitter_emit_node(emitter, event)
 }
 
 // Expect a node.
 func ini_emitter_emit_node(emitter *ini_emitter_t, event *ini_event_t) bool {
 	switch event.typ {
-	case ini_KEY_EVENT:
-		return ini_emitter_emit_scalar(emitter, event)
-	case ini_COMMENT_EVENT:
+	case ini_ELEMENT_KEY_EVENT:
+		return ini_emitter_emit_element(emitter, event)
+	case ini_COMMENT_START_EVENT:
 		return ini_emitter_emit_comment(emitter, event)
 	default:
 		return ini_emitter_set_emitter_error(emitter,
@@ -297,18 +266,18 @@ func ini_emitter_emit_comment(emitter *ini_emitter_t, event *ini_event_t) bool {
 	if !ini_emitter_write_indicator(emitter, []byte{'#'}, false, false) {
 		return false
 	}
-	if !ini_emitter_process_scalar(emitter) {
+	if !ini_emitter_process_element(emitter) {
 		return false
 	}
 	return false
 }
 
 // Expect SCALAR.
-func ini_emitter_emit_scalar(emitter *ini_emitter_t, event *ini_event_t) bool {
+func ini_emitter_emit_element(emitter *ini_emitter_t, event *ini_event_t) bool {
 	if !ini_emitter_select_scalar_style(emitter, event) {
 		return false
 	}
-	if !ini_emitter_process_scalar(emitter) {
+	if !ini_emitter_process_element(emitter) {
 		return false
 	}
 	emitter.state = emitter.states[len(emitter.states)-1]
@@ -327,7 +296,7 @@ func ini_emitter_check_empty_section(emitter *ini_emitter_t) bool {
 		return false
 	}
 	return emitter.events[emitter.events_head].typ == ini_SECTION_START_EVENT &&
-		emitter.events[emitter.events_head+1].typ == ini_SECTION_END_EVENT
+		emitter.events[emitter.events_head+1].typ == ini_SECTION_ENTRY_EVENT
 }
 
 // Check if the next events represent an empty comment.
@@ -335,7 +304,7 @@ func ini_emitter_check_empty_comment(emitter *ini_emitter_t) bool {
 	if len(emitter.events)-emitter.events_head < 2 {
 		return false
 	}
-	return emitter.events[emitter.events_head].typ == ini_COMMENT_EVENT
+	return emitter.events[emitter.events_head].typ == ini_COMMENT_START_EVENT
 }
 
 // Determine an acceptable scalar style.
@@ -350,9 +319,6 @@ func ini_emitter_select_scalar_style(emitter *ini_emitter_t, event *ini_event_t)
 		if len(emitter.scalar_data.value) == 0 {
 			style = ini_SINGLE_QUOTED_SCALAR_STYLE
 		}
-		if !event.implicit {
-			style = ini_SINGLE_QUOTED_SCALAR_STYLE
-		}
 	}
 	if style == ini_SINGLE_QUOTED_SCALAR_STYLE {
 		if !emitter.scalar_data.single_quoted_allowed {
@@ -365,13 +331,13 @@ func ini_emitter_select_scalar_style(emitter *ini_emitter_t, event *ini_event_t)
 }
 
 // Write a scalar.
-func ini_emitter_process_scalar(emitter *ini_emitter_t) bool {
+func ini_emitter_process_element(emitter *ini_emitter_t) bool {
 	switch emitter.scalar_data.style {
 	case ini_SINGLE_QUOTED_SCALAR_STYLE:
-		return ini_emitter_write_single_quoted_scalar(emitter, emitter.scalar_data.value)
+		return ini_emitter_write_single_quoted_element(emitter, emitter.scalar_data.value)
 
 	case ini_DOUBLE_QUOTED_SCALAR_STYLE:
-		return ini_emitter_write_double_quoted_scalar(emitter, emitter.scalar_data.value)
+		return ini_emitter_write_double_quoted_element(emitter, emitter.scalar_data.value)
 	}
 	panic("unknown scalar style")
 }
@@ -403,7 +369,7 @@ func ini_emitter_write_indicator(emitter *ini_emitter_t, indicator []byte, need_
 	return true
 }
 
-func ini_emitter_write_single_quoted_scalar(emitter *ini_emitter_t, value []byte) bool {
+func ini_emitter_write_single_quoted_element(emitter *ini_emitter_t, value []byte) bool {
 
 	if !ini_emitter_write_indicator(emitter, []byte{'\''}, true, false) {
 		return false
@@ -444,7 +410,7 @@ func ini_emitter_write_single_quoted_scalar(emitter *ini_emitter_t, value []byte
 	return true
 }
 
-func ini_emitter_write_double_quoted_scalar(emitter *ini_emitter_t, value []byte) bool {
+func ini_emitter_write_double_quoted_element(emitter *ini_emitter_t, value []byte) bool {
 	if !ini_emitter_write_indicator(emitter, []byte{'"'}, true, false) {
 		return false
 	}

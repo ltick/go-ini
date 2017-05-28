@@ -128,53 +128,30 @@ func ini_emitter_set_break(emitter *ini_emitter_t, line_break ini_break_t) {
 	emitter.line_break = line_break
 }
 
-// Create DOCUMENT-START.
-func ini_document_start_event_initialize(event *ini_event_t) bool {
+// Create DOCUMENT-CONTENT.
+func ini_document_event_initialize(event *ini_event_t) bool {
 	*event = ini_event_t{
 		typ: ini_DOCUMENT_START_EVENT,
 	}
 	return true
 }
 
-// Create DOCUMENT-END.
-func ini_document_end_event_initialize(event *ini_event_t) bool {
-	*event = ini_event_t{
-		typ: ini_DOCUMENT_END_EVENT,
-	}
-	return true
-}
-
-// Create SECTION-START.
-func ini_section_start_event_initialize(event *ini_event_t) bool {
+// Create SECTION-ENTRY.
+func ini_section_event_initialize(event *ini_event_t, value []byte, inherit []byte) bool {
 	*event = ini_event_t{
 		typ: ini_SECTION_START_EVENT,
+        value:   value,
+        inherit: inherit,
 	}
 	return true
 }
 
-// Create SECTION-END.
-func ini_section_end_event_initialize(event *ini_event_t) bool {
+// Create ELEMENT.
+func ini_element_event_initialize(event *ini_event_t, value []byte, style ini_scalar_style_t) bool {
 	*event = ini_event_t{
-		typ: ini_SECTION_END_EVENT,
-	}
-	return true
-}
-
-// Create SECTION-INHERIT.
-func ini_section_inherit_event_initialize(event *ini_event_t) bool {
-	*event = ini_event_t{
-		typ: ini_SECTION_INHERIT_EVENT,
-	}
-	return true
-}
-
-// Create NODE.
-func ini_node_event_initialize(event *ini_event_t, value []byte, implicit bool, style ini_scalar_style_t) bool {
-	*event = ini_event_t{
-		typ:      ini_KEY_EVENT,
-		value:    value,
-		implicit: implicit,
-		style:    ini_style_t(style),
+		typ:     ini_ELEMENT_KEY_EVENT,
+		value:   value,
+		style:   ini_style_t(style),
 	}
 	return true
 }
