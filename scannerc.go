@@ -27,11 +27,12 @@ import (
 //
 // Now, tokens:
 //
-//      DOCUMENT-START                    # The stream start.
-//      DOCUMENT-END                      # The stream end.
+//      DOCUMENT-START                  # The stream start.
+//      DOCUMENT-END                    # The stream end.
 //      SECTION-START            		# '['
 //      SECTION-INHERIT     			# ':'
 //      SECTION-END               		# ']'
+//     	KEY                           	# nothing.
 //      VALUE                           # '='
 // 		SCALAR(value,style)             # A scalar.
 //      COMMENT             			# '#', ';'
@@ -52,7 +53,8 @@ import (
 //
 //		Tokens:
 //
-//			SCALAR('key', plain)
+//			KEY
+// 			SCALAR('key', plain)
 //			VALUE
 //			SCALAR('value', plain)
 //
@@ -62,6 +64,7 @@ import (
 //
 //		Tokens:
 //
+//			KEY
 //			SCALAR('key', plain)
 //			VALUE
 //			SCALAR('value', double-quoted)
@@ -89,11 +92,13 @@ import (
 //
 //          DOCUMENT-START
 //          SECTION-START
-//			SCALAR('section', plain)
+//          SCALAR('section', plain)
 //			SECTION-END
+//			KEY
 //			SCALAR('key', plain)
 //			VALUE
 //			SCALAR('value', plain)
+//          DOCUMENT-END
 //
 //      2. Several sections in a document:
 //
@@ -108,15 +113,18 @@ import (
 //          SECTION-START
 //			SCALAR('section', plain)
 //			SECTION-END
+//			KEY
 //			SCALAR('key1', plain)
 //			VALUE
 //			SCALAR('value1', double-quoted)
 //          SECTION-START
 //			SCALAR('another_section', plain)
 //			SECTION-END
+//			KEY
 //			SCALAR('key2', single-quoted)
 //			VALUE
 //			SCALAR('value2', single-quoted)
+//          DOCUMENT-END
 //
 //      3. An sections inherit another :
 //
@@ -131,6 +139,7 @@ import (
 //          SECTION-START
 //			SCALAR('section', plain)
 //			SECTION-END
+//			KEY
 //			SCALAR('key1', plain)
 //			VALUE
 //			SCALAR('value1', double-quoted)
@@ -139,9 +148,11 @@ import (
 //			SECTION-INHERIT
 //			SCALAR('section', plain)
 //			SECTION-END
+//			KEY
 //			SCALAR('key1', double-quoted)
 //			VALUE
 //			SCALAR('value2', single-quoted)
+//          DOCUMENT-END
 //
 //
 // also we can add comments in document.If the line cini_parser_parseontains
@@ -157,6 +168,7 @@ import (
 //			DOCUMENT-START
 //          COMMENT
 //			SCALAR('comment_1', plain)
+//          DOCUMENT-END
 //
 //      2. Comment after section:
 //
@@ -170,6 +182,7 @@ import (
 //			SECTION-END
 //			COMMENT
 //			SCALAR('section_comment', plain)
+//          DOCUMENT-END
 //
 // 		3. Comment after value:
 //
@@ -184,6 +197,7 @@ import (
 //			SCALAR('value', plain)
 //			COMMENT
 //			SCALAR('comment_1', plain)
+//          DOCUMENT-END
 
 // Ensure that the buffer contains the required number of characters.
 // Return true on success, false on failure (reader error or memory error).
@@ -376,17 +390,18 @@ func ini_parser_fetch_next_token(parser *ini_parser_t) bool {
 
 	// Is it the item value indicator?
 	if parser.buffer[parser.buffer_pos] == '=' {
-		return ini_parser_fetch_value(parser)
-	}
-
-	if !is_blankz(parser.buffer, parser.buffer_pos) {
-		if parser.buffer[parser.buffer_pos] == '\'' { // Is it a single-quoted scalar?
-			return ini_parser_fetch_element(parser, true)
-		} else if parser.buffer[parser.buffer_pos] == '"' { // Is it a double-quoted scalar?
-            return ini_parser_fetch_element(parser, false)
-        }  else {
-            return ini_parser_fetch_plain_element(parser)
-        }
+		for !is_blankz(parser.buffer, parser.buffer_pos) {
+			parser.buffer_pos++
+		}
+		if parser.buffer[parser.buffer_pos] == '\'' {
+			// Is it a single-quoted scalar?
+			return ini_parser_fetch_element_value(parser, true)
+		} else if parser.buffer[parser.buffer_pos] == '"' {
+			// Is it a double-quoted scalar?
+			return ini_parser_fetch_element_value(parser, false)
+		} else {
+			return ini_parser_fetch_plain_element_value(parser)
+		}
 	}
 
 	// If we don't determine the token type so far, it is an error.
@@ -431,7 +446,7 @@ func ini_parser_fetch_section(parser *ini_parser_t) bool {
 	// try to scan name.
 	for parser.buffer[parser.buffer_pos] != ']' && parser.buffer[parser.buffer_pos] != ':' &&
 		parser.buffer[parser.buffer_pos] != '\n' {
-		ini_parser_fetch_plain_element(parser)
+		ini_parser_fetch_plain_element_value(parser)
 	}
 	// Check for ':' and eat it.
 	if parser.buffer[parser.buffer_pos] == ':' {
@@ -484,34 +499,11 @@ func ini_parser_fetch_section(parser *ini_parser_t) bool {
 	return true
 }
 
-// Produce the VALUE token.
-func ini_parser_fetch_value(parser *ini_parser_t) bool {
-	// Consume the token.
-    // Eat '['
-    if parser.buffer[parser.buffer_pos] == '=' {
-        start_mark := parser.mark
-        skip(parser)
-        if parser.unread < 1 && !ini_parser_update_buffer(parser, 1) {
-            return false
-        }
-        end_mark := parser.mark
-        token := ini_token_t{
-            typ:        ini_VALUE_TOKEN,
-            start_mark: start_mark,
-            end_mark:   end_mark,
-            value:      parser.buffer[start_mark.index:end_mark.index],
-        }
-        ini_insert_token(parser, -1, &token)
-        return true
-    }
-    return false
-}
-
 // Produce the SCALAR(...,plain) token.
-func ini_parser_fetch_plain_element(parser *ini_parser_t) bool {
+func ini_parser_fetch_plain_element_value(parser *ini_parser_t) bool {
 	// Create the SCALAR token and append it to the queue.
 	var token ini_token_t
-	if !ini_parser_scan_plain_element(parser, &token) {
+	if !ini_parser_scan_plain_element_value(parser, &token) {
 		return false
 	}
 	ini_insert_token(parser, -1, &token)
@@ -519,7 +511,7 @@ func ini_parser_fetch_plain_element(parser *ini_parser_t) bool {
 }
 
 // Scan a plain scalar.
-func ini_parser_scan_plain_element(parser *ini_parser_t, token *ini_token_t) bool {
+func ini_parser_scan_plain_element_value(parser *ini_parser_t, token *ini_token_t) bool {
 	start_mark := parser.mark
 
 	var s []byte
@@ -564,7 +556,7 @@ func ini_parser_scan_plain_element(parser *ini_parser_t, token *ini_token_t) boo
 
 	// Create a token.
 	*token = ini_token_t{
-		typ:        ini_SCALAR_TOKEN,
+		typ:        ini_ELEMENT_VALUE_TOKEN,
 		start_mark: start_mark,
 		end_mark:   end_mark,
 		value:      s,
@@ -575,9 +567,9 @@ func ini_parser_scan_plain_element(parser *ini_parser_t, token *ini_token_t) boo
 }
 
 // Produce the NODE token.
-func ini_parser_fetch_element(parser *ini_parser_t, single bool) bool {
+func ini_parser_fetch_element_value(parser *ini_parser_t, single bool) bool {
 	var token ini_token_t
-	if !ini_parser_scan_element(parser, &token, single) {
+	if !ini_parser_scan_element_value(parser, &token, single) {
 		return false
 	}
 	ini_insert_token(parser, -1, &token)
@@ -585,7 +577,7 @@ func ini_parser_fetch_element(parser *ini_parser_t, single bool) bool {
 }
 
 // Scan a node value.
-func ini_parser_scan_element(parser *ini_parser_t, token *ini_token_t, single bool) bool {
+func ini_parser_scan_element_value(parser *ini_parser_t, token *ini_token_t, single bool) bool {
 	start_mark := parser.mark
 
 	var s []byte
@@ -763,7 +755,7 @@ func ini_parser_scan_element(parser *ini_parser_t, token *ini_token_t, single bo
 
 	// Create a token.
 	*token = ini_token_t{
-		typ:        ini_SCALAR_TOKEN,
+		typ:        ini_ELEMENT_VALUE_TOKEN,
 		start_mark: start_mark,
 		end_mark:   end_mark,
 		value:      s,

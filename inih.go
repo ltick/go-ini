@@ -74,7 +74,9 @@ const (
 	ini_SECTION_INHERIT_TOKEN // A SECTION INHERIT token.
 	ini_SECTION_END_TOKEN     // A SECTION-END token.
 
-	ini_VALUE_TOKEN // An VALUE token.
+	ini_ELEMENT_VALUE_TOKEN // An VALUE token.
+	ini_ELEMENT_KEY_TOKEN // An VALUE token.
+	ini_SCALAR_TOKEN // A SCALAR token.
 
 	ini_COMMENT_START_TOKEN // A COMMENT-START token.
 	ini_COMMENT_END_TOKEN   // A COMMENT-END token.
@@ -94,8 +96,12 @@ func (tt ini_token_type_t) String() string {
 		return "ini_SECTION_END_TOKEN"
 	case ini_SECTION_INHERIT_TOKEN:
 		return "ini_SECTION_INHERIT_TOKEN"
-	case ini_VALUE_TOKEN:
-		return "ini_VALUE_TOKEN"
+    case ini_ELEMENT_KEY_TOKEN:
+        return "ini_ELEMENT_KEY_TOKEN"
+	case ini_ELEMENT_VALUE_TOKEN:
+		return "ini_ELEMENT_VALUE_TOKEN"
+    case ini_SCALAR_TOKEN:
+        return "ini_SCALAR_TOKEN"
 	case ini_COMMENT_START_TOKEN:
 		return "ini_COMMENT_START_TOKEN"
 	case ini_COMMENT_END_TOKEN:
@@ -135,10 +141,8 @@ const (
 	ini_SECTION_INHERIT_EVENT // A SECTION-ENTRY event.
 	ini_SECTION_START_EVENT   // A SECTION-START event.
 
-	ini_ELEMENT_KEY_EVENT   // An ELEMENT event.
-	ini_ELEMENT_VALUE_EVENT // An ELEMENT event.
-	ini_COMMENT_START_EVENT // A COMMENT event.
-	ini_COMMENT_END_EVENT   // A COMMENT event.
+	ini_ELEMENT_EVENT   // An ELEMENT event.
+	ini_COMMENT_EVENT // A COMMENT event.
 )
 
 // The event structure.

@@ -140,7 +140,7 @@ func ini_emitter_need_more_events(emitter *ini_emitter_t) bool {
 	case ini_SECTION_START_EVENT:
 		accumulate = 2
 		break
-	case ini_COMMENT_START_EVENT:
+	case ini_COMMENT_EVENT:
 		accumulate = 3
 		break
 	default:
@@ -250,9 +250,9 @@ func ini_emitter_emit_section_end(emitter *ini_emitter_t, event *ini_event_t, fi
 // Expect a node.
 func ini_emitter_emit_node(emitter *ini_emitter_t, event *ini_event_t) bool {
 	switch event.typ {
-	case ini_ELEMENT_KEY_EVENT:
+	case ini_ELEMENT_EVENT:
 		return ini_emitter_emit_element(emitter, event)
-	case ini_COMMENT_START_EVENT:
+	case ini_COMMENT_EVENT:
 		return ini_emitter_emit_comment(emitter, event)
 	default:
 		return ini_emitter_set_emitter_error(emitter,
@@ -304,7 +304,7 @@ func ini_emitter_check_empty_comment(emitter *ini_emitter_t) bool {
 	if len(emitter.events)-emitter.events_head < 2 {
 		return false
 	}
-	return emitter.events[emitter.events_head].typ == ini_COMMENT_START_EVENT
+	return emitter.events[emitter.events_head].typ == ini_COMMENT_EVENT
 }
 
 // Determine an acceptable scalar style.

@@ -13,8 +13,7 @@ const (
 	documentNode = 1 << iota
 	sectionNode
 	commentNode
-	itemNode
-	scalarNode
+	elementNode
 )
 
 type node struct {
@@ -48,7 +47,7 @@ func newParser(b []byte) *parser {
 	if p.event.typ != ini_DOCUMENT_START_EVENT {
 		panic("expected stream start event, got " + strconv.Itoa(int(p.event.typ)))
 	}
-	p.skip()
+    p.skip()
 	return &p
 }
 
@@ -92,15 +91,14 @@ func (p *parser) fail() {
 }
 
 func (p *parser) parse() *node {
-	fmt.Println(p.event.typ)
 	switch p.event.typ {
-	case ini_ELEMENT_KEY_EVENT:
+	case ini_ELEMENT_EVENT:
 		return p.element()
 	case ini_DOCUMENT_START_EVENT:
 		return p.document()
 	case ini_SECTION_ENTRY_EVENT:
 		return p.section()
-	case ini_COMMENT_START_EVENT:
+	case ini_COMMENT_EVENT:
 		return p.comment()
 	case ini_DOCUMENT_END_EVENT:
 		// Happens when attempting to decode an empty buffer.
@@ -119,15 +117,11 @@ func (p *parser) node(kind int) *node {
 }
 
 func (p *parser) document() *node {
-	fmt.Println("document")
 	n := p.node(documentNode)
-	fmt.Println(n)
 	p.doc = n
 	p.skip()
-	n.children = append(n.children, p.parse())
-	fmt.Println(n.children)
-	if p.event.typ != ini_DOCUMENT_END_EVENT {
-		panic("expected end of document event but got " + strconv.Itoa(int(p.event.typ)))
+	for p.event.typ != ini_DOCUMENT_END_EVENT {
+        n.children = append(n.children, p.parse())
 	}
 	p.skip()
 	return n
@@ -147,11 +141,10 @@ func (p *parser) section() *node {
 				n.children = section.children
 			}
 		}
-	} else if p.event.typ == ini_SECTION_START_EVENT {
-		p.skip()
 	}
-	for p.event.typ != ini_SECTION_START_EVENT {
-		n.children = append(n.children, p.item())
+	// until next ini_SECTION_ENTRY_EVENT
+	for p.event.typ != ini_SECTION_ENTRY_EVENT {
+		n.children = append(n.children, p.parse())
 	}
 	p.skip()
 	return n
@@ -164,18 +157,12 @@ func (p *parser) comment() *node {
 	return n
 }
 
-func (p *parser) item() *node {
-	n := p.node(itemNode)
-	n.value = string(p.event.value)
-	p.skip()
-	return n
-}
 
 func (p *parser) element() *node {
-	n := p.node(scalarNode)
-	n.value = string(p.event.value)
-	p.skip()
-	return n
+    n := p.node(elementNode)
+    n.value = string(p.event.value)
+    p.skip()
+    return n
 }
 
 // ----------------------------------------------------------------------------
@@ -279,7 +266,7 @@ func (d *decoder) unmarshal(n *node, out reflect.Value) (good bool) {
 	switch n.kind {
 	case sectionNode:
 		good = d.section(n, out)
-	case scalarNode:
+	case elementNode:
 		good = d.element(n, out)
 	default:
 		panic("internal error: unknown node kind: " + strconv.Itoa(n.kind))
@@ -331,7 +318,7 @@ func (d *decoder) section(n *node, out reflect.Value) (good bool) {
 	j := 0
 	for i := 0; i < l; i++ {
 		e := reflect.New(et).Elem()
-		if ok := d.element(n.children[i], e); ok {
+		if ok := d.unmarshal(n.children[i], e); ok {
 			out.Index(j).Set(e)
 			j++
 		}
@@ -621,5 +608,5 @@ func (d *decoder) merge(n *node, out reflect.Value) {
 }
 
 func isMerge(n *node) bool {
-	return n.kind == scalarNode
+	return n.kind == elementNode
 }

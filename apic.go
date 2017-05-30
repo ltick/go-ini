@@ -128,10 +128,18 @@ func ini_emitter_set_break(emitter *ini_emitter_t, line_break ini_break_t) {
 	emitter.line_break = line_break
 }
 
-// Create DOCUMENT-CONTENT.
-func ini_document_event_initialize(event *ini_event_t) bool {
+// Create DOCUMENT-START.
+func ini_document_start_event_initialize(event *ini_event_t) bool {
 	*event = ini_event_t{
 		typ: ini_DOCUMENT_START_EVENT,
+	}
+	return true
+}
+
+// Create DOCUMENT-END.
+func ini_document_end_event_initialize(event *ini_event_t) bool {
+	*event = ini_event_t{
+		typ: ini_DOCUMENT_END_EVENT,
 	}
 	return true
 }
@@ -149,7 +157,7 @@ func ini_section_event_initialize(event *ini_event_t, value []byte, inherit []by
 // Create ELEMENT.
 func ini_element_event_initialize(event *ini_event_t, value []byte, style ini_scalar_style_t) bool {
 	*event = ini_event_t{
-		typ:     ini_ELEMENT_KEY_EVENT,
+		typ:     ini_ELEMENT_EVENT,
 		value:   value,
 		style:   ini_style_t(style),
 	}

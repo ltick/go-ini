@@ -63,8 +63,8 @@ func Unmarshal(in []byte, out interface{}) (err error) {
 	d := newDecoder()
 	p := newParser(in)
 	defer p.destroy()
-	fmt.Println("node:")
 	node := p.parse()
+	fmt.Println("node:")
 	fmt.Println(node)
 	if node != nil {
 		v := reflect.ValueOf(out)
