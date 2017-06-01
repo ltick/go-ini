@@ -137,7 +137,7 @@ func ini_emitter_need_more_events(emitter *ini_emitter_t) bool {
 	case ini_DOCUMENT_START_EVENT:
 		accumulate = 1
 		break
-	case ini_SECTION_START_EVENT:
+	case ini_SECTION_ENTRY_EVENT:
 		accumulate = 2
 		break
 	case ini_COMMENT_EVENT:
@@ -152,7 +152,7 @@ func ini_emitter_need_more_events(emitter *ini_emitter_t) bool {
 	var level int
 	for i := emitter.events_head; i < len(emitter.events); i++ {
 		switch emitter.events[i].typ {
-		case ini_DOCUMENT_START_EVENT, ini_SECTION_START_EVENT:
+		case ini_DOCUMENT_START_EVENT, ini_SECTION_ENTRY_EVENT:
 			level++
 		}
 		if level == 0 {
@@ -250,8 +250,8 @@ func ini_emitter_emit_section_end(emitter *ini_emitter_t, event *ini_event_t, fi
 // Expect a node.
 func ini_emitter_emit_node(emitter *ini_emitter_t, event *ini_event_t) bool {
 	switch event.typ {
-	case ini_ELEMENT_EVENT:
-		return ini_emitter_emit_element(emitter, event)
+	case ini_SCALAR_EVENT:
+		return ini_emitter_emit_scalar(emitter, event)
 	case ini_COMMENT_EVENT:
 		return ini_emitter_emit_comment(emitter, event)
 	default:
@@ -273,7 +273,7 @@ func ini_emitter_emit_comment(emitter *ini_emitter_t, event *ini_event_t) bool {
 }
 
 // Expect SCALAR.
-func ini_emitter_emit_element(emitter *ini_emitter_t, event *ini_event_t) bool {
+func ini_emitter_emit_scalar(emitter *ini_emitter_t, event *ini_event_t) bool {
 	if !ini_emitter_select_scalar_style(emitter, event) {
 		return false
 	}
@@ -295,8 +295,12 @@ func ini_emitter_check_empty_section(emitter *ini_emitter_t) bool {
 	if len(emitter.events)-emitter.events_head < 2 {
 		return false
 	}
-	return emitter.events[emitter.events_head].typ == ini_SECTION_START_EVENT &&
-		emitter.events[emitter.events_head+1].typ == ini_SECTION_ENTRY_EVENT
+	if emitter.events[emitter.events_head].typ == ini_SECTION_ENTRY_EVENT &&
+			(emitter.events[emitter.events_head+1].typ == ini_SECTION_ENTRY_EVENT ||  emitter.events[emitter.events_head+2].typ == ini_SECTION_ENTRY_EVENT) {
+		return true
+	}
+	return false
+
 }
 
 // Check if the next events represent an empty comment.

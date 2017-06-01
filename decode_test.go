@@ -5,6 +5,8 @@ import (
 	"reflect"
 	"testing"
 	"tick-config-ini"
+	"fmt"
+	"strconv"
 )
 
 var failingErr = errors.New("failingErr")
@@ -296,7 +298,8 @@ var unmarshalTests = []struct {
 type M map[interface{}]interface{}
 
 func TestUnmarshal(t *testing.T) {
-	for _, item := range unmarshalTests {
+	for index, item := range unmarshalTests {
+		fmt.Println("Test" + strconv.Itoa(index))
 		itemValue := reflect.ValueOf(item.value)
 		var value interface{}
 		var typ reflect.Type = itemValue.Type()

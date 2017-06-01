@@ -14,6 +14,7 @@ const (
 	sectionNode
 	commentNode
 	elementNode
+	scalarNode
 )
 
 type node struct {
@@ -47,7 +48,6 @@ func newParser(b []byte) *parser {
 	if p.event.typ != ini_DOCUMENT_START_EVENT {
 		panic("expected stream start event, got " + strconv.Itoa(int(p.event.typ)))
 	}
-    p.skip()
 	return &p
 }
 
@@ -92,12 +92,12 @@ func (p *parser) fail() {
 
 func (p *parser) parse() *node {
 	switch p.event.typ {
-	case ini_ELEMENT_EVENT:
-		return p.element()
 	case ini_DOCUMENT_START_EVENT:
 		return p.document()
 	case ini_SECTION_ENTRY_EVENT:
 		return p.section()
+	case ini_SCALAR_EVENT:
+		return p.scalar()
 	case ini_COMMENT_EVENT:
 		return p.comment()
 	case ini_DOCUMENT_END_EVENT:
@@ -120,8 +120,9 @@ func (p *parser) document() *node {
 	n := p.node(documentNode)
 	p.doc = n
 	p.skip()
-	for p.event.typ != ini_DOCUMENT_END_EVENT {
-        n.children = append(n.children, p.parse())
+	n.children = append(n.children, p.parse())
+	if p.event.typ != ini_DOCUMENT_END_EVENT {
+		panic("expected end of document event but got " + strconv.Itoa(int(p.event.typ)))
 	}
 	p.skip()
 	return n
@@ -157,12 +158,11 @@ func (p *parser) comment() *node {
 	return n
 }
 
-
-func (p *parser) element() *node {
-    n := p.node(elementNode)
-    n.value = string(p.event.value)
-    p.skip()
-    return n
+func (p *parser) scalar() *node {
+	n := p.node(scalarNode)
+	n.value = string(p.event.value)
+	p.skip()
+	return n
 }
 
 // ----------------------------------------------------------------------------
@@ -266,8 +266,6 @@ func (d *decoder) unmarshal(n *node, out reflect.Value) (good bool) {
 	switch n.kind {
 	case sectionNode:
 		good = d.section(n, out)
-	case elementNode:
-		good = d.element(n, out)
 	default:
 		panic("internal error: unknown node kind: " + strconv.Itoa(n.kind))
 	}
@@ -330,7 +328,7 @@ func (d *decoder) section(n *node, out reflect.Value) (good bool) {
 	return true
 }
 
-func (d *decoder) element(n *node, out reflect.Value) (good bool) {
+func (d *decoder) scalar(n *node, out reflect.Value) (good bool) {
 	var resolved interface{}
 	if resolved == nil {
 		if out.Kind() == reflect.Map && !out.CanAddr() {

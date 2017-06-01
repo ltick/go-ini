@@ -6,7 +6,7 @@ import (
 )
 
 func ini_insert_token(parser *ini_parser_t, pos int, token *ini_token_t) {
-	//fmt.Println("ini_insert_token", "pos:", pos, "typ:", token.typ, "head:", parser.tokens_head, "len:", len(parser.tokens))
+	//trace("ini_insert_token", "pos:", pos, "typ:", token.typ, "head:", parser.tokens_head, "len:", len(parser.tokens))
 
 	// Check if we can move the queue at the beginning of the buffer.
 	if parser.tokens_head > 0 && len(parser.tokens) == cap(parser.tokens) {
@@ -147,7 +147,7 @@ func ini_document_end_event_initialize(event *ini_event_t) bool {
 // Create SECTION-ENTRY.
 func ini_section_event_initialize(event *ini_event_t, value []byte, inherit []byte) bool {
 	*event = ini_event_t{
-		typ: ini_SECTION_START_EVENT,
+		typ: ini_SECTION_ENTRY_EVENT,
         value:   value,
         inherit: inherit,
 	}
@@ -155,9 +155,9 @@ func ini_section_event_initialize(event *ini_event_t, value []byte, inherit []by
 }
 
 // Create ELEMENT.
-func ini_element_event_initialize(event *ini_event_t, value []byte, style ini_scalar_style_t) bool {
+func ini_scalar_event_initialize(event *ini_event_t, value []byte, style ini_scalar_style_t) bool {
 	*event = ini_event_t{
-		typ:     ini_ELEMENT_EVENT,
+		typ:     ini_SCALAR_EVENT,
 		value:   value,
 		style:   ini_style_t(style),
 	}

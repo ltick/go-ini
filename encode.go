@@ -187,6 +187,6 @@ func (e *encoder) nilv() {
 }
 
 func (e *encoder) emitNode(value string, style ini_scalar_style_t) {
-	e.must(ini_element_event_initialize(&e.event, []byte(value), style))
+	e.must(ini_scalar_event_initialize(&e.event, []byte(value), style))
 	e.emit()
 }
