@@ -441,8 +441,9 @@ func ini_parser_decrease_level(parser *ini_parser_t) bool {
 func ini_parser_fetch_section(parser *ini_parser_t) bool {
 	// Eat '['
 	if parser.buffer[parser.buffer_pos] == '[' {
-		start_mark := parser.mark
-		skip(parser)
+        var s []byte
+        start_mark := parser.mark
+        s = read(parser, s)
 		if parser.unread < 1 && !ini_parser_update_buffer(parser, 1) {
 			return false
 		}
@@ -451,7 +452,7 @@ func ini_parser_fetch_section(parser *ini_parser_t) bool {
 			typ:        ini_SECTION_START_TOKEN,
 			start_mark: start_mark,
 			end_mark:   end_mark,
-			value:      parser.buffer[start_mark.index:end_mark.index],
+			value:      s,
 		}
 		ini_insert_token(parser, -1, &token)
 	}
@@ -462,9 +463,10 @@ func ini_parser_fetch_section(parser *ini_parser_t) bool {
 	}
 	// Check for ':' and eat it.
 	if parser.buffer[parser.buffer_pos] == ':' {
-		start_mark := parser.mark
-		skip(parser)
-		if parser.unread < 1 && !ini_parser_update_buffer(parser, 1) {
+        var s []byte
+        start_mark := parser.mark
+        s = read(parser, s)
+        if parser.unread < 1 && !ini_parser_update_buffer(parser, 1) {
 			return false
 		}
 		end_mark := parser.mark
@@ -472,16 +474,17 @@ func ini_parser_fetch_section(parser *ini_parser_t) bool {
 			typ:        ini_SECTION_INHERIT_TOKEN,
 			start_mark: start_mark,
 			end_mark:   end_mark,
-			value:      parser.buffer[start_mark.index:end_mark.index],
+			value:      s,
 		}
 		ini_insert_token(parser, -1, &token)
 	}
 
 	// Check for ']' and eat it.
 	if parser.buffer[parser.buffer_pos] == ']' {
-		start_mark := parser.mark
-		skip(parser)
-		if parser.unread < 1 && !ini_parser_update_buffer(parser, 1) {
+        var s []byte
+        start_mark := parser.mark
+        s = read(parser, s)
+        if parser.unread < 1 && !ini_parser_update_buffer(parser, 1) {
 			return false
 		}
 		end_mark := parser.mark
@@ -489,21 +492,15 @@ func ini_parser_fetch_section(parser *ini_parser_t) bool {
 			typ:        ini_SECTION_END_TOKEN,
 			start_mark: start_mark,
 			end_mark:   end_mark,
-			value:      parser.buffer[start_mark.index:end_mark.index],
+			value:      s,
 		}
 		ini_insert_token(parser, -1, &token)
 	} else if is_crlf(parser.buffer, parser.buffer_pos) {
-		start_mark := parser.mark
-		skip(parser)
-		if parser.unread < 1 && !ini_parser_update_buffer(parser, 1) {
-			return false
-		}
-		end_mark := parser.mark
 		token := ini_token_t{
 			typ:        ini_SECTION_END_TOKEN,
-			start_mark: start_mark,
-			end_mark:   end_mark,
-			value:      parser.buffer[start_mark.index:end_mark.index],
+			start_mark: parser.mark,
+			end_mark:   parser.mark,
+			value:      parser.buffer[parser.mark.index:parser.mark.index],
 		}
 		ini_insert_token(parser, -1, &token)
 	}
@@ -559,21 +556,18 @@ func ini_parser_fetch_element_key(parser *ini_parser_t, single bool) bool {
 func ini_parser_fetch_plain_element_value(parser *ini_parser_t) bool {
     // Eat '='
     if parser.buffer[parser.buffer_pos] == '=' {
+        var s []byte
         start_mark := parser.mark
-        skip(parser)
+        s = read(parser, s)
         if parser.unread < 1 && !ini_parser_update_buffer(parser, 1) {
             return false
         }
         end_mark := parser.mark
-        fmt.Println()
-        fmt.Println(end_mark.index)
-        fmt.Println(string(parser.buffer))
-        fmt.Println(string(parser.buffer[1:2]))
         token := ini_token_t{
             typ:        ini_SECTION_VALUE_TOKEN,
             start_mark: start_mark,
             end_mark:   end_mark,
-            value:      parser.buffer[1:2],
+            value:      s,
         }
         ini_insert_token(parser, -1, &token)
     }
@@ -589,8 +583,9 @@ func ini_parser_fetch_plain_element_value(parser *ini_parser_t) bool {
 func ini_parser_fetch_element_value(parser *ini_parser_t, single bool) bool {
     // Eat '='
     if parser.buffer[parser.buffer_pos] == '=' {
+        var s []byte
         start_mark := parser.mark
-        skip(parser)
+        s = read(parser, s)
         if parser.unread < 1 && !ini_parser_update_buffer(parser, 1) {
             return false
         }
@@ -599,7 +594,7 @@ func ini_parser_fetch_element_value(parser *ini_parser_t, single bool) bool {
             typ:        ini_SECTION_VALUE_TOKEN,
             start_mark: start_mark,
             end_mark:   end_mark,
-            value:      parser.buffer[start_mark.index:end_mark.index],
+            value:      s,
         }
         ini_insert_token(parser, -1, &token)
     }
