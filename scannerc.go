@@ -510,6 +510,11 @@ func ini_parser_fetch_section(parser *ini_parser_t) bool {
 
 // Produce the KEY token.
 func ini_parser_fetch_plain_element_key(parser *ini_parser_t) bool {
+    // key must start with alpha([0-9a-zA-Z_-])
+    if !is_alpha(parser.buffer, parser.buffer_pos) {
+        failf("found invaild character(%c) that cannot start with while scanning for key", parser.buffer[parser.buffer_pos])
+    }
+
 	token := ini_token_t{
 		typ:        ini_SECTION_KEY_TOKEN,
 		start_mark: parser.mark,
@@ -518,20 +523,21 @@ func ini_parser_fetch_plain_element_key(parser *ini_parser_t) bool {
 	}
 	ini_insert_token(parser, -1, &token)
 
-    // key must start with alpha([0-9a-zA-Z_-])
-    if !is_alpha(parser.buffer, parser.buffer_pos) {
-        failf("found invaild character(%c) that cannot start with while scanning for key", parser.buffer[parser.buffer_pos])
-    }
-
 	if !ini_parser_fetch_plain_scalar(parser) {
 		return false
 	}
+
 
 	return true
 }
 
 // Produce the NODE token.
 func ini_parser_fetch_element_key(parser *ini_parser_t, single bool) bool {
+    // key must start with alpha([0-9a-zA-Z_-])
+    if !is_alpha(parser.buffer, parser.buffer_pos+1) {
+        failf("found invaild character(%c) that cannot start with while scanning for key", parser.buffer[parser.buffer_pos])
+    }
+
 	token := ini_token_t{
 		typ:        ini_SECTION_KEY_TOKEN,
 		start_mark: parser.mark,
@@ -539,11 +545,6 @@ func ini_parser_fetch_element_key(parser *ini_parser_t, single bool) bool {
 		value:      parser.buffer[parser.mark.index:parser.mark.index],
 	}
 	ini_insert_token(parser, -1, &token)
-
-    // key must start with alpha([0-9a-zA-Z_-])
-    if !is_alpha(parser.buffer, parser.buffer_pos+1) {
-        failf("found invaild character(%c) that cannot start with while scanning for key", parser.buffer[parser.buffer_pos])
-    }
 
 	if !ini_parser_fetch_scalar(parser, single) {
 		return false

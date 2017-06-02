@@ -1,8 +1,5 @@
 package ini
 
-import "fmt"
-
-
 // The parser implements the following grammar:
 //
 // document		::= DOCUMENT-START section* DOCUMENT-END
@@ -22,8 +19,6 @@ func peek_token(parser *ini_parser_t) *ini_token_t {
 func skip_token(parser *ini_parser_t) {
 	parser.token_available = false
 	parser.tokens_parsed++
-    fmt.Println(parser.tokens[0].typ)
-    fmt.Println(parser.tokens_head)
 	parser.document_end_produced = parser.tokens[parser.tokens_head].typ == ini_DOCUMENT_END_TOKEN
 	parser.tokens_head++
 }
@@ -168,12 +163,13 @@ func ini_parser_parse_element_key(parser *ini_parser_t, event *ini_event_t, firs
 	if token == nil {
 		return false
 	}
-	skip_token(parser)
+    skip_token(parser)
 	if token.typ == ini_SECTION_KEY_TOKEN {
 		token = peek_token(parser)
 		if token == nil {
 			return false
 		}
+        skip_token(parser)
 		if token.typ == ini_SCALAR_TOKEN {
 			parser.state = ini_PARSE_SECTION_VALUE_STATE
 			*event = ini_event_t{
@@ -182,7 +178,6 @@ func ini_parser_parse_element_key(parser *ini_parser_t, event *ini_event_t, firs
 				end_mark:   token.end_mark,
 				value:      token.value,
 			}
-            skip_token(parser)
 		} else {
 			return ini_parser_set_parser_error(parser, "did not find expected <scalar>", token.start_mark)
 		}
@@ -194,7 +189,6 @@ func ini_parser_parse_element_key(parser *ini_parser_t, event *ini_event_t, firs
 			start_mark: token.start_mark,
 			end_mark:   token.end_mark,
 		}
-        skip_token(parser)
 	}
 
 	return false
@@ -205,6 +199,7 @@ func ini_parser_parse_element_key(parser *ini_parser_t, event *ini_event_t, firs
 //
 func ini_parser_parse_element_value(parser *ini_parser_t, event *ini_event_t) bool {
 	//defer trace("ini_parser_parse_element_value")()
+
 	token := peek_token(parser)
 	if token == nil {
 		return false
@@ -212,6 +207,10 @@ func ini_parser_parse_element_value(parser *ini_parser_t, event *ini_event_t) bo
     skip_token(parser)
 	if token.typ == ini_SECTION_VALUE_TOKEN {
 		parser.state = ini_PARSE_SECTION_KEY_STATE
+        token := peek_token(parser)
+        if token == nil {
+            return false
+        }
 		*event = ini_event_t{
 			typ:        ini_SCALAR_EVENT,
 			start_mark: token.start_mark,
@@ -219,7 +218,7 @@ func ini_parser_parse_element_value(parser *ini_parser_t, event *ini_event_t) bo
 			value:      token.value,
 			style:      ini_style_t(token.style),
 		}
-		skip_token(parser)
+        skip_token(parser)
 		return true
 	} else if token.typ == ini_DOCUMENT_END_TOKEN {
 		parser.state = ini_PARSE_DOCUMENT_END_STATE
@@ -228,8 +227,8 @@ func ini_parser_parse_element_value(parser *ini_parser_t, event *ini_event_t) bo
 			start_mark: token.start_mark,
 			end_mark:   token.end_mark,
 		}
-        skip_token(parser)
 	}
+
 	return ini_parser_set_parser_error(parser, "did not find expected <value>", token.start_mark)
 }
 

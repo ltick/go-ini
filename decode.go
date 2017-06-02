@@ -144,9 +144,12 @@ func (p *parser) section() *node {
 		}
 	}
 	// until next ini_SECTION_ENTRY_EVENT
-	for p.event.typ != ini_SECTION_ENTRY_EVENT {
-		n.children = append(n.children, p.parse())
+	for p.event.typ != ini_SECTION_ENTRY_EVENT && p.event.typ != ini_DOCUMENT_END_EVENT{
+        fmt.Println(p.event.typ)
+        fmt.Println(p.parse())
+		//n.children = append(n.children, p.parse())
 	}
+    fmt.Println("Asdasda")
 	p.skip()
 	return n
 }
