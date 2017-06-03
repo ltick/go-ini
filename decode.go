@@ -44,10 +44,12 @@ func newParser(b []byte) *parser {
 	}
 
 	ini_parser_set_input_string(&p.parser, b)
+ 
 	p.skip()
 	if p.event.typ != ini_DOCUMENT_START_EVENT {
 		panic("expected stream start event, got " + strconv.Itoa(int(p.event.typ)))
 	}
+    p.skip()
 	return &p
 }
 
@@ -124,7 +126,6 @@ func (p *parser) document() *node {
 	if p.event.typ != ini_DOCUMENT_END_EVENT {
 		panic("expected end of document event but got " + strconv.Itoa(int(p.event.typ)))
 	}
-	p.skip()
 	return n
 }
 
@@ -144,13 +145,9 @@ func (p *parser) section() *node {
 		}
 	}
 	// until next ini_SECTION_ENTRY_EVENT
-	for p.event.typ != ini_SECTION_ENTRY_EVENT && p.event.typ != ini_DOCUMENT_END_EVENT{
-        fmt.Println(p.event.typ)
-        fmt.Println(p.parse())
-		//n.children = append(n.children, p.parse())
+	for p.event.typ != ini_SECTION_END_EVENT && p.event.typ != ini_DOCUMENT_END_EVENT {
+		n.children = append(n.children, p.parse())
 	}
-    fmt.Println("Asdasda")
-	p.skip()
 	return n
 }
 
@@ -255,17 +252,19 @@ func (d *decoder) prepare(n *node, out reflect.Value) (newout reflect.Value, unm
 }
 
 func (d *decoder) unmarshal(n *node, out reflect.Value) (good bool) {
+    fmt.Println("kind:")
+    fmt.Println(n.kind)
 	switch n.kind {
 	case documentNode:
 		return d.document(n, out)
 	}
+    fmt.Println("kind:")
+    fmt.Println(n.kind)
 	out, unmarshaled, good := d.prepare(n, out)
 	fmt.Println(unmarshaled)
 	if unmarshaled {
 		return good
 	}
-	fmt.Println("kind:")
-	fmt.Println(n.kind)
 	switch n.kind {
 	case sectionNode:
 		good = d.section(n, out)
