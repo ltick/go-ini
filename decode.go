@@ -13,7 +13,6 @@ const (
 	documentNode = 1 << iota
 	sectionNode
 	commentNode
-	elementNode
 	scalarNode
 )
 
@@ -44,12 +43,11 @@ func newParser(b []byte) *parser {
 	}
 
 	ini_parser_set_input_string(&p.parser, b)
- 
+
 	p.skip()
 	if p.event.typ != ini_DOCUMENT_START_EVENT {
-		panic("expected stream start event, got " + strconv.Itoa(int(p.event.typ)))
+		panic("expected ini_DOCUMENT_START_EVENT, got " + p.event.event_type())
 	}
-    p.skip()
 	return &p
 }
 
@@ -106,7 +104,7 @@ func (p *parser) parse() *node {
 		// Happens when attempting to decode an empty buffer.
 		return nil
 	default:
-		panic("attempted to parse unknown event: " + strconv.Itoa(int(p.event.typ)))
+		panic("attempted to parse unknown event: " + p.event.event_type())
 	}
 }
 
@@ -122,9 +120,12 @@ func (p *parser) document() *node {
 	n := p.node(documentNode)
 	p.doc = n
 	p.skip()
-	n.children = append(n.children, p.parse())
+	childNode := p.parse()
 	if p.event.typ != ini_DOCUMENT_END_EVENT {
-		panic("expected end of document event but got " + strconv.Itoa(int(p.event.typ)))
+		panic("expected ini_DOCUMENT_END_EVENT, got " + p.event.event_type())
+	}
+	if childNode != nil {
+		n.children = append(n.children, childNode)
 	}
 	return n
 }
@@ -132,11 +133,7 @@ func (p *parser) document() *node {
 func (p *parser) section() *node {
 	n := p.node(sectionNode)
 	n.value = string(p.event.value)
-	p.skip()
-	p.parse()
-	if p.event.typ == ini_SECTION_ENTRY_EVENT {
-		p.skip()
-	} else if p.event.typ == ini_SECTION_INHERIT_EVENT {
+	if p.event.typ == ini_SECTION_INHERIT_EVENT {
 		for i := len(p.doc.children) - 1; i >= 0; i-- {
 			section := p.doc.children[i]
 			if section.value == string(p.event.value) {
@@ -145,9 +142,11 @@ func (p *parser) section() *node {
 		}
 	}
 	// until next ini_SECTION_ENTRY_EVENT
-	for p.event.typ != ini_SECTION_END_EVENT && p.event.typ != ini_DOCUMENT_END_EVENT {
-		n.children = append(n.children, p.parse())
+	p.skip()
+	for p.event.typ != ini_SECTION_END_EVENT {
+		n.children = append(n.children, p.parse(), p.parse())
 	}
+	p.skip()
 	return n
 }
 
@@ -170,7 +169,6 @@ func (p *parser) scalar() *node {
 
 type decoder struct {
 	doc     *node
-	aliases map[string]bool
 	mapType reflect.Type
 	terrors []string
 }
@@ -184,7 +182,6 @@ var (
 
 func newDecoder() *decoder {
 	d := &decoder{mapType: defaultMapType}
-	d.aliases = make(map[string]bool)
 	return d
 }
 
@@ -252,22 +249,19 @@ func (d *decoder) prepare(n *node, out reflect.Value) (newout reflect.Value, unm
 }
 
 func (d *decoder) unmarshal(n *node, out reflect.Value) (good bool) {
-    fmt.Println("kind:")
-    fmt.Println(n.kind)
 	switch n.kind {
 	case documentNode:
 		return d.document(n, out)
 	}
-    fmt.Println("kind:")
-    fmt.Println(n.kind)
 	out, unmarshaled, good := d.prepare(n, out)
-	fmt.Println(unmarshaled)
 	if unmarshaled {
 		return good
 	}
 	switch n.kind {
 	case sectionNode:
 		good = d.section(n, out)
+	case scalarNode:
+		good = d.scalar(n, out)
 	default:
 		panic("internal error: unknown node kind: " + strconv.Itoa(n.kind))
 	}
@@ -299,48 +293,69 @@ func settableValueOf(i interface{}) reflect.Value {
 }
 
 func (d *decoder) section(n *node, out reflect.Value) (good bool) {
-	l := len(n.children)
-
-	var iface reflect.Value
 	switch out.Kind() {
+	case reflect.Struct:
+		return d.mappingStruct(n, out)
 	case reflect.Slice:
-		out.Set(reflect.MakeSlice(out.Type(), l, l))
+		return d.mappingSlice(n, out)
+	case reflect.Map:
+	// okay
 	case reflect.Interface:
-		// No type hints. Will have to use a generic section.
-		iface = out
-		out = settableValueOf(make([]interface{}, l))
+		if d.mapType.Kind() == reflect.Map {
+			iface := out
+			out = reflect.MakeMap(d.mapType)
+			iface.Set(out)
+		} else {
+			slicev := reflect.New(d.mapType).Elem()
+			if !d.mappingSlice(n, slicev) {
+				return false
+			}
+			out.Set(slicev)
+			return true
+		}
 	default:
 		d.terror(n, out)
 		return false
 	}
-	et := out.Type().Elem()
+	outt := out.Type()
+	kt := outt.Key()
+	et := outt.Elem()
 
-	j := 0
-	for i := 0; i < l; i++ {
-		e := reflect.New(et).Elem()
-		if ok := d.unmarshal(n.children[i], e); ok {
-			out.Index(j).Set(e)
-			j++
+	mapType := d.mapType
+	if outt.Key() == ifaceType && outt.Elem() == ifaceType {
+		d.mapType = outt
+	}
+
+	if out.IsNil() {
+		out.Set(reflect.MakeMap(outt))
+	}
+	l := len(n.children)
+	for i := 0; i < l; i += 2 {
+		if isMerge(n.children[i]) {
+			d.merge(n.children[i+1], out)
+			continue
+		}
+		k := reflect.New(kt).Elem()
+		if d.unmarshal(n.children[i], k) {
+			kkind := k.Kind()
+			if kkind == reflect.Interface {
+				kkind = k.Elem().Kind()
+			}
+			if kkind == reflect.Map || kkind == reflect.Slice {
+				failf("invalid map key: %#v", k.Interface())
+			}
+			e := reflect.New(et).Elem()
+			if d.unmarshal(n.children[i+1], e) {
+				out.SetMapIndex(k, e)
+			}
 		}
 	}
-	out.Set(out.Slice(0, j))
-	if iface.IsValid() {
-		iface.Set(out)
-	}
+	d.mapType = mapType
 	return true
 }
 
 func (d *decoder) scalar(n *node, out reflect.Value) (good bool) {
-	var resolved interface{}
-	if resolved == nil {
-		if out.Kind() == reflect.Map && !out.CanAddr() {
-			resetMap(out)
-		} else {
-			out.Set(reflect.Zero(out.Type()))
-		}
-		return true
-	}
-	if s, ok := resolved.(string); ok && out.CanAddr() {
+	if s, ok := n.value.(string); ok && out.CanAddr() {
 		if u, ok := out.Addr().Interface().(encoding.TextUnmarshaler); ok {
 			err := u.UnmarshalText([]byte(s))
 			if err != nil {
@@ -351,19 +366,19 @@ func (d *decoder) scalar(n *node, out reflect.Value) (good bool) {
 	}
 	switch out.Kind() {
 	case reflect.String:
-		if resolved != nil {
+		if n.value != nil {
 			out.SetString(n.value)
 			good = true
 		}
 	case reflect.Interface:
-		if resolved == nil {
+		if n.value == nil {
 			out.Set(reflect.Zero(out.Type()))
 		} else {
-			out.Set(reflect.ValueOf(resolved))
+			out.Set(reflect.ValueOf(n.value))
 		}
 		good = true
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		switch resolved := resolved.(type) {
+		switch resolved := n.value.(type) {
 		case int:
 			if !out.OverflowInt(int64(resolved)) {
 				out.SetInt(int64(resolved))
@@ -394,7 +409,7 @@ func (d *decoder) scalar(n *node, out reflect.Value) (good bool) {
 			}
 		}
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
-		switch resolved := resolved.(type) {
+		switch resolved := n.value.(type) {
 		case int:
 			if resolved >= 0 && !out.OverflowUint(uint64(resolved)) {
 				out.SetUint(uint64(resolved))
@@ -417,13 +432,13 @@ func (d *decoder) scalar(n *node, out reflect.Value) (good bool) {
 			}
 		}
 	case reflect.Bool:
-		switch resolved := resolved.(type) {
+		switch resolved := n.value.(type) {
 		case bool:
 			out.SetBool(resolved)
 			good = true
 		}
 	case reflect.Float32, reflect.Float64:
-		switch resolved := resolved.(type) {
+		switch resolved := n.value.(type) {
 		case int:
 			out.SetFloat(float64(resolved))
 			good = true
@@ -491,10 +506,6 @@ func (d *decoder) mapping(n *node, out reflect.Value) (good bool) {
 	}
 	l := len(n.children)
 	for i := 0; i < l; i += 2 {
-		if isMerge(n.children[i]) {
-			d.merge(n.children[i+1], out)
-			continue
-		}
 		k := reflect.New(kt).Elem()
 		if d.unmarshal(n.children[i], k) {
 			kkind := k.Kind()
@@ -527,10 +538,6 @@ func (d *decoder) mappingSlice(n *node, out reflect.Value) (good bool) {
 	var slice []MapItem
 	var l = len(n.children)
 	for i := 0; i < l; i += 2 {
-		if isMerge(n.children[i]) {
-			d.merge(n.children[i+1], out)
-			continue
-		}
 		item := MapItem{}
 		k := reflect.ValueOf(&item.Key).Elem()
 		if d.unmarshal(n.children[i], k) {
@@ -563,10 +570,6 @@ func (d *decoder) mappingStruct(n *node, out reflect.Value) (good bool) {
 
 	for i := 0; i < l; i += 2 {
 		ni := n.children[i]
-		if isMerge(ni) {
-			d.merge(n.children[i+1], out)
-			continue
-		}
 		if !d.unmarshal(ni, name) {
 			continue
 		}
@@ -588,25 +591,4 @@ func (d *decoder) mappingStruct(n *node, out reflect.Value) (good bool) {
 		}
 	}
 	return true
-}
-
-func failWantMap() {
-	failf("map merge requires map or sequence of maps as the value")
-}
-
-func (d *decoder) merge(n *node, out reflect.Value) {
-	switch n.kind {
-	case sectionNode:
-		// Step backwards as earlier nodes take precedence.
-		for i := len(n.children) - 1; i >= 0; i-- {
-			ni := n.children[i]
-			d.unmarshal(ni, out)
-		}
-	default:
-		failWantMap()
-	}
-}
-
-func isMerge(n *node) bool {
-	return n.kind == elementNode
 }

@@ -164,6 +164,28 @@ type ini_event_t struct {
 	style ini_style_t
 }
 
+func (e *ini_event_t) event_type() string {
+	switch e.typ {
+	case ini_NO_EVENT:
+		return "ini_NO_EVENT"
+	case ini_DOCUMENT_START_EVENT:
+		return "ini_DOCUMENT_START_EVENT"
+	case ini_DOCUMENT_END_EVENT:
+		return "ini_DOCUMENT_END_EVENT"
+	case ini_SECTION_ENTRY_EVENT:
+		return "ini_SECTION_ENTRY_EVENT"
+	case ini_SECTION_INHERIT_EVENT:
+		return "ini_SECTION_INHERIT_EVENT"
+	case ini_SECTION_END_EVENT:
+		return "ini_SECTION_END_EVENT"
+	case ini_SCALAR_EVENT:
+		return "ini_SCALAR_EVENT"
+	case ini_COMMENT_EVENT:
+		return "ini_COMMENT_EVENT"
+	}
+	return "<unknown token>"
+}
+
 func (e *ini_event_t) scalar_style() ini_scalar_style_t { return ini_scalar_style_t(e.style) }
 
 type ini_section_type_t int

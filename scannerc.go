@@ -402,7 +402,6 @@ func ini_parser_fetch_next_token(parser *ini_parser_t) bool {
 			return ini_parser_fetch_plain_element_value(parser)
 		}
 	}
-
 	for is_blankz(parser.buffer, parser.buffer_pos) {
 		parser.buffer_pos++
 	}
@@ -413,7 +412,7 @@ func ini_parser_fetch_next_token(parser *ini_parser_t) bool {
 		// Is it a double-quoted scalar?
 		return ini_parser_fetch_element_key(parser, false)
 	} else {
-		return ini_parser_fetch_plain_element_key(parser)
+		return ini_parser_fetch_plain_section_key(parser)
 	}
 
 	// If we don't determine the token type so far, it is an error.
@@ -509,10 +508,12 @@ func ini_parser_fetch_section(parser *ini_parser_t) bool {
 }
 
 // Produce the KEY token.
-func ini_parser_fetch_plain_element_key(parser *ini_parser_t) bool {
+func ini_parser_fetch_plain_section_key(parser *ini_parser_t) bool {
     // key must start with alpha([0-9a-zA-Z_-])
     if !is_alpha(parser.buffer, parser.buffer_pos) {
-        failf("found invaild character(%c) that cannot start with while scanning for key", parser.buffer[parser.buffer_pos])
+        return ini_parser_set_scanner_error(parser,
+            "while scanning for the section key", parser.mark,
+            "found character("+string([]byte{parser.buffer[parser.buffer_pos+1]})+") that cannot start for any section key")
     }
 
 	token := ini_token_t{
@@ -535,7 +536,9 @@ func ini_parser_fetch_plain_element_key(parser *ini_parser_t) bool {
 func ini_parser_fetch_element_key(parser *ini_parser_t, single bool) bool {
     // key must start with alpha([0-9a-zA-Z_-])
     if !is_alpha(parser.buffer, parser.buffer_pos+1) {
-        failf("found invaild character(%c) that cannot start with while scanning for key", parser.buffer[parser.buffer_pos])
+        return ini_parser_set_scanner_error(parser,
+            "while scanning for the section key", parser.mark,
+            "found character("+string([]byte{parser.buffer[parser.buffer_pos+1]})+") that cannot start for any section key")
     }
 
 	token := ini_token_t{
