@@ -2,6 +2,7 @@ package ini
 
 import (
 	"encoding"
+	"encoding/base64"
 	"fmt"
 	"math"
 	"reflect"
@@ -19,6 +20,7 @@ const (
 type node struct {
 	kind         int
 	line, column int
+	tag          string
 	value        string
 	children     []*node
 }
@@ -185,14 +187,17 @@ func newDecoder() *decoder {
 	return d
 }
 
-func (d *decoder) terror(n *node, out reflect.Value) {
+func (d *decoder) terror(n *node, tag string, out reflect.Value) {
+	if n.tag != "" {
+		tag = n.tag
+	}
 	value := n.value
 	if len(value) > 10 {
 		value = " `" + value[:7] + "...`"
 	} else {
 		value = " `" + value + "`"
 	}
-	d.terrors = append(d.terrors, fmt.Sprintf("line %d: cannot unmarshal %s into %s", n.line+1, value, out.Type()))
+	d.terrors = append(d.terrors, fmt.Sprintf("line %d: cannot unmarshal %s%s into %s", n.line+1, shortTag(tag), value, out.Type()))
 }
 
 func (d *decoder) callUnmarshaler(n *node, u Unmarshaler) (good bool) {
@@ -296,8 +301,6 @@ func (d *decoder) section(n *node, out reflect.Value) (good bool) {
 	switch out.Kind() {
 	case reflect.Struct:
 		return d.mappingStruct(n, out)
-	case reflect.Slice:
-		return d.mappingSlice(n, out)
 	case reflect.Map:
 	// okay
 	case reflect.Interface:
@@ -305,16 +308,13 @@ func (d *decoder) section(n *node, out reflect.Value) (good bool) {
 			iface := out
 			out = reflect.MakeMap(d.mapType)
 			iface.Set(out)
+            return true
 		} else {
-			slicev := reflect.New(d.mapType).Elem()
-			if !d.mappingSlice(n, slicev) {
-				return false
-			}
-			out.Set(slicev)
-			return true
-		}
+            d.terror(n, ini_SECTION_TAG, out)
+            return false
+        }
 	default:
-		d.terror(n, out)
+		d.terror(n, ini_SECTION_TAG, out)
 		return false
 	}
 	outt := out.Type()
@@ -331,10 +331,6 @@ func (d *decoder) section(n *node, out reflect.Value) (good bool) {
 	}
 	l := len(n.children)
 	for i := 0; i < l; i += 2 {
-		if isMerge(n.children[i]) {
-			d.merge(n.children[i+1], out)
-			continue
-		}
 		k := reflect.New(kt).Elem()
 		if d.unmarshal(n.children[i], k) {
 			kkind := k.Kind()
@@ -355,7 +351,30 @@ func (d *decoder) section(n *node, out reflect.Value) (good bool) {
 }
 
 func (d *decoder) scalar(n *node, out reflect.Value) (good bool) {
-	if s, ok := n.value.(string); ok && out.CanAddr() {
+	var tag string
+	var resolved interface{}
+	if n.tag == "" {
+		tag = ini_STR_TAG
+		resolved = n.value
+	} else {
+		tag, resolved = resolve(n.tag, n.value)
+		if tag == ini_BINARY_TAG {
+			data, err := base64.StdEncoding.DecodeString(resolved.(string))
+			if err != nil {
+				failf("!!binary value contains invalid base64 data")
+			}
+			resolved = string(data)
+		}
+	}
+	if resolved == nil {
+		if out.Kind() == reflect.Map && !out.CanAddr() {
+			resetMap(out)
+		} else {
+			out.Set(reflect.Zero(out.Type()))
+		}
+		return true
+	}
+	if s, ok := resolved.(string); ok && out.CanAddr() {
 		if u, ok := out.Addr().Interface().(encoding.TextUnmarshaler); ok {
 			err := u.UnmarshalText([]byte(s))
 			if err != nil {
@@ -366,19 +385,22 @@ func (d *decoder) scalar(n *node, out reflect.Value) (good bool) {
 	}
 	switch out.Kind() {
 	case reflect.String:
-		if n.value != nil {
+		if tag == ini_BINARY_TAG {
+			out.SetString(resolved.(string))
+			good = true
+		} else if resolved != nil {
 			out.SetString(n.value)
 			good = true
 		}
 	case reflect.Interface:
-		if n.value == nil {
+		if resolved == nil {
 			out.Set(reflect.Zero(out.Type()))
 		} else {
-			out.Set(reflect.ValueOf(n.value))
+			out.Set(reflect.ValueOf(resolved))
 		}
 		good = true
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		switch resolved := n.value.(type) {
+		switch resolved := resolved.(type) {
 		case int:
 			if !out.OverflowInt(int64(resolved)) {
 				out.SetInt(int64(resolved))
@@ -409,7 +431,7 @@ func (d *decoder) scalar(n *node, out reflect.Value) (good bool) {
 			}
 		}
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
-		switch resolved := n.value.(type) {
+		switch resolved := resolved.(type) {
 		case int:
 			if resolved >= 0 && !out.OverflowUint(uint64(resolved)) {
 				out.SetUint(uint64(resolved))
@@ -432,13 +454,13 @@ func (d *decoder) scalar(n *node, out reflect.Value) (good bool) {
 			}
 		}
 	case reflect.Bool:
-		switch resolved := n.value.(type) {
+		switch resolved := resolved.(type) {
 		case bool:
 			out.SetBool(resolved)
 			good = true
 		}
 	case reflect.Float32, reflect.Float64:
-		switch resolved := n.value.(type) {
+		switch resolved := resolved.(type) {
 		case int:
 			out.SetFloat(float64(resolved))
 			good = true
@@ -462,94 +484,9 @@ func (d *decoder) scalar(n *node, out reflect.Value) (good bool) {
 		}
 	}
 	if !good {
-		d.terror(n, out)
+		d.terror(n, tag, out)
 	}
 	return good
-}
-
-func (d *decoder) mapping(n *node, out reflect.Value) (good bool) {
-	switch out.Kind() {
-	case reflect.Struct:
-		return d.mappingStruct(n, out)
-	case reflect.Slice:
-		return d.mappingSlice(n, out)
-	case reflect.Map:
-		// okay
-	case reflect.Interface:
-		if d.mapType.Kind() == reflect.Map {
-			iface := out
-			out = reflect.MakeMap(d.mapType)
-			iface.Set(out)
-		} else {
-			slicev := reflect.New(d.mapType).Elem()
-			if !d.mappingSlice(n, slicev) {
-				return false
-			}
-			out.Set(slicev)
-			return true
-		}
-	default:
-		d.terror(n, out)
-		return false
-	}
-	outt := out.Type()
-	kt := outt.Key()
-	et := outt.Elem()
-
-	mapType := d.mapType
-	if outt.Key() == ifaceType && outt.Elem() == ifaceType {
-		d.mapType = outt
-	}
-
-	if out.IsNil() {
-		out.Set(reflect.MakeMap(outt))
-	}
-	l := len(n.children)
-	for i := 0; i < l; i += 2 {
-		k := reflect.New(kt).Elem()
-		if d.unmarshal(n.children[i], k) {
-			kkind := k.Kind()
-			if kkind == reflect.Interface {
-				kkind = k.Elem().Kind()
-			}
-			if kkind == reflect.Map || kkind == reflect.Slice {
-				failf("invalid map key: %#v", k.Interface())
-			}
-			e := reflect.New(et).Elem()
-			if d.unmarshal(n.children[i+1], e) {
-				out.SetMapIndex(k, e)
-			}
-		}
-	}
-	d.mapType = mapType
-	return true
-}
-
-func (d *decoder) mappingSlice(n *node, out reflect.Value) (good bool) {
-	outt := out.Type()
-	if outt.Elem() != mapItemType {
-		d.terror(n, out)
-		return false
-	}
-
-	mapType := d.mapType
-	d.mapType = outt
-
-	var slice []MapItem
-	var l = len(n.children)
-	for i := 0; i < l; i += 2 {
-		item := MapItem{}
-		k := reflect.ValueOf(&item.Key).Elem()
-		if d.unmarshal(n.children[i], k) {
-			v := reflect.ValueOf(&item.Value).Elem()
-			if d.unmarshal(n.children[i+1], v) {
-				slice = append(slice, item)
-			}
-		}
-	}
-	out.Set(reflect.ValueOf(slice))
-	d.mapType = mapType
-	return true
 }
 
 func (d *decoder) mappingStruct(n *node, out reflect.Value) (good bool) {
