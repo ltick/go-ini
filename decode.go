@@ -162,6 +162,7 @@ func (p *parser) comment() *node {
 func (p *parser) scalar() *node {
 	n := p.node(scalarNode)
 	n.value = string(p.event.value)
+    n.tag = string(p.event.tag)
 	p.skip()
 	return n
 }
@@ -197,7 +198,7 @@ func (d *decoder) terror(n *node, tag string, out reflect.Value) {
 	} else {
 		value = " `" + value + "`"
 	}
-	d.terrors = append(d.terrors, fmt.Sprintf("line %d: cannot unmarshal %s%s into %s", n.line+1, shortTag(tag), value, out.Type()))
+	d.terrors = append(d.terrors, fmt.Sprintf("line %d: cannot unmarshal %s%s into %s", n.line+1, tag, value, out.Type()))
 }
 
 func (d *decoder) callUnmarshaler(n *node, u Unmarshaler) (good bool) {

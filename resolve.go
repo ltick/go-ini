@@ -55,21 +55,70 @@ func init() {
 	}
 }
 
-const longTagPrefix = "tag:yaml.org,2002:"
-
-func shortTag(tag string) string {
-	// TODO This can easily be made faster and produce less garbage.
-	if strings.HasPrefix(tag, longTagPrefix) {
-		return "!!" + tag[len(longTagPrefix):]
-	}
-	return tag
-}
-
-func longTag(tag string) string {
-	if strings.HasPrefix(tag, "!!") {
-		return longTagPrefix + tag[2:]
-	}
-	return tag
+func analyzeTag(in string) (tag string) {
+    hint := byte('N')
+    if in != "" {
+        hint = resolveTable[in[0]]
+    }
+    if hint != 0 {
+        // Handle things we can lookup in a map.
+        if item, ok := resolveMap[in]; ok {
+            return item.tag
+        }
+    
+        switch hint {
+        case '.':
+            // Not in the map, so maybe a normal float.
+            _, err := strconv.ParseFloat(in, 64)
+            if err == nil {
+                return ini_FLOAT_TAG
+            }
+    
+        case 'D', 'S':
+            // Int, float, or timestamp.
+            plain := strings.Replace(in, "_", "", -1)
+            _, err := strconv.ParseInt(plain, 0, 64)
+            if err == nil {
+                    return ini_INT_TAG
+            }
+            _, err = strconv.ParseUint(plain, 0, 64)
+            if err == nil {
+                return ini_INT_TAG
+            }
+            if iniStyleFloat.MatchString(plain) {
+                _, err := strconv.ParseFloat(plain, 64)
+                if err == nil {
+                    return ini_FLOAT_TAG
+                }
+            }
+            if strings.HasPrefix(plain, "0b") {
+                _, err := strconv.ParseInt(plain[2:], 2, 64)
+                if err == nil {
+                    return ini_INT_TAG
+                }
+                _, err = strconv.ParseUint(plain[2:], 2, 64)
+                if err == nil {
+                    return ini_INT_TAG
+                }
+            } else if strings.HasPrefix(plain, "-0b") {
+                _, err := strconv.ParseInt(plain[3:], 2, 64)
+                if err == nil {
+                    return ini_INT_TAG
+                }
+            }
+        // XXX Handle timestamps here.
+    
+        default:
+            panic("resolveTable item not yet handled: " + string(rune(hint)) + " (with " + in + ")")
+        }
+    }
+    if tag == ini_BINARY_TAG {
+        return ini_BINARY_TAG
+    }
+    if utf8.ValidString(in) {
+        return ini_STR_TAG
+    }
+    return ini_BINARY_TAG
 }
 
 func resolvableTag(tag string) bool {
@@ -80,7 +129,7 @@ func resolvableTag(tag string) bool {
 	return false
 }
 
-var yamlStyleFloat = regexp.MustCompile(`^[-+]?[0-9]*\.?[0-9]+([eE][-+][0-9]+)?$`)
+var iniStyleFloat = regexp.MustCompile(`^[-+]?[0-9]*\.?[0-9]+([eE][-+][0-9]+)?$`)
 
 func resolve(tag string, in string) (rtag string, out interface{}) {
 	if !resolvableTag(tag) {
@@ -92,7 +141,7 @@ func resolve(tag string, in string) (rtag string, out interface{}) {
 		case "", rtag, ini_STR_TAG, ini_BINARY_TAG:
 			return
 		}
-		failf("cannot decode %s `%s` as a %s", shortTag(rtag), in, shortTag(tag))
+		failf("cannot decode %s `%s` as a %s", rtag, in, tag)
 	}()
 
 	// Any data is accepted as a !!str or !!binary.
@@ -137,7 +186,7 @@ func resolve(tag string, in string) (rtag string, out interface{}) {
 			if err == nil {
 				return ini_INT_TAG, uintv
 			}
-			if yamlStyleFloat.MatchString(plain) {
+			if iniStyleFloat.MatchString(plain) {
 				floatv, err := strconv.ParseFloat(plain, 64)
 				if err == nil {
 					return ini_FLOAT_TAG, floatv

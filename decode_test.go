@@ -32,7 +32,6 @@ var unmarshalTests = []struct {
     }, {
         "v =true",
         map[string]interface{}{"v": true},
-        /*
     }, {
         "v = 10",
         map[string]interface{}{"v": 10},
@@ -57,6 +56,7 @@ var unmarshalTests = []struct {
     }, {
         "v= -.1",
         map[string]interface{}{"v": -0.1},
+        /*
     },
 
     // Simple values.

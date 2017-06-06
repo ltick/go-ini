@@ -121,7 +121,7 @@ type ini_token_t struct {
 	// The scalar value
 	// (for ini_SCALAR_TOKEN).
 	value []byte
-
+	
 	// The scalar style (for ini_SCALAR_TOKEN).
 	style ini_scalar_style_t
 }
@@ -156,6 +156,9 @@ type ini_event_t struct {
 
 	// The node value.
 	value []byte
+    
+    // The tag (for ini_SCALAR_EVENT).
+    tag []byte
 
 	// for ini_SECTION_INHERIT_EVENT.
 	inherit []byte
@@ -199,6 +202,8 @@ const (
 	ini_BINARY_TAG = "binary"
     
     ini_SECTION_TAG = "section"
+    
+    ini_DEFAULT_SCALAR_TAG   = ini_STR_TAG // The default scalar tag is str
 )
 
 type ini_section_type_t int
