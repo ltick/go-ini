@@ -401,6 +401,9 @@ func ini_parser_fetch_next_token(parser *ini_parser_t) bool {
 		} else {
 			return ini_parser_fetch_plain_element_value(parser)
 		}
+		for is_blankz(parser.buffer, parser.buffer_pos) {
+			parser.buffer_pos++
+		}
 	}
 	for is_blankz(parser.buffer, parser.buffer_pos) {
 		parser.buffer_pos++
@@ -513,7 +516,7 @@ func ini_parser_fetch_plain_section_key(parser *ini_parser_t) bool {
     if !is_alpha(parser.buffer, parser.buffer_pos) {
         return ini_parser_set_scanner_error(parser,
             "while scanning for the section key", parser.mark,
-            "found character("+string([]byte{parser.buffer[parser.buffer_pos+1]})+") that cannot start for any section key")
+            "found character("+string([]byte{parser.buffer[parser.buffer_pos]})+") that cannot start for any section key")
     }
 
 	token := ini_token_t{

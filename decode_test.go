@@ -21,14 +21,9 @@ var unmarshalTests = []struct {
 		"",
 		&struct{}{},
 	}, {
-		".",
-		&struct{}{},
-	}, {
 		"v= hi",
 		map[string]string{"v": "hi"},
-		/*
-}, {
-
+	}, {
         "v= hi",
         map[string]interface{}{"v": "hi"},
     }, {
@@ -37,6 +32,7 @@ var unmarshalTests = []struct {
     }, {
         "v =true",
         map[string]interface{}{"v": true},
+        /*
     }, {
         "v = 10",
         map[string]interface{}{"v": 10},
@@ -314,9 +310,12 @@ func TestUnmarshal(t *testing.T) {
 			t.Fatalf("missing case for %s", typ)
 		}
 		err := ini.Unmarshal([]byte(item.data), value)
+		fmt.Println(err)
 		if err != nil {
-			t.Error("TestUnmarshal Failed")
+			t.Error("TestUnmarshal Failed! " + err.Error())
 		}
+		fmt.Println(value)
+		fmt.Println(item.value)
 		if !reflect.DeepEqual(value, item.value) {
 			t.Errorf("%v and %v does not equal!", value, item.value)
 		}
