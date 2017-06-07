@@ -7,6 +7,7 @@ import (
 	"tick-config-ini"
 	"fmt"
 	"strconv"
+    "math"
 )
 
 var failingErr = errors.New("failingErr")
@@ -56,87 +57,80 @@ var unmarshalTests = []struct {
     }, {
         "v= -.1",
         map[string]map[string]interface{}{"default":map[string]interface{}{"v": -0.1}},
-        /*
-    },
-
-    // Simple values.
-    {
-        "123",
-        &unmarshalIntTest,
     },
 
     // Floats from spec
     {
         "canonical= 6.8523e+5",
-        map[string]interface{}{"canonical": 6.8523e+5},
+        map[string]map[string]interface{}{"default":map[string]interface{}{"canonical": 6.8523e+5}},
     }, {
         "expo= 685.230_15e+03",
-        map[string]interface{}{"expo": 685.23015e+03},
+        map[string]map[string]interface{}{"default":map[string]interface{}{"expo": 685.23015e+03}},
     }, {
         "fixed= 685_230.15",
-        map[string]interface{}{"fixed": 685230.15},
+        map[string]map[string]interface{}{"default":map[string]interface{}{"fixed": 685230.15}},
     }, {
         "fixed= 685_230.15",
-        map[string]float64{"fixed": 685230.15},
+        map[string]map[string]float64{"default":map[string]float64{"fixed": 685230.15}},
     },
 
     // Bools from spec
     {
         "canonical= y",
-        map[string]interface{}{"canonical": true},
+        map[string]map[string]interface{}{"default":map[string]interface{}{"canonical": true}},
     }, {
-        "answer:= NO",
-        map[string]interface{}{"answer": false},
+        "answer= NO",
+        map[string]map[string]interface{}{"default":map[string]interface{}{"answer": false}},
     }, {
         "logical= True",
-        map[string]interface{}{"logical": true},
+        map[string]map[string]interface{}{"default":map[string]interface{}{"logical": true}},
     }, {
         "option= on",
-        map[string]interface{}{"option": true},
+        map[string]map[string]interface{}{"default":map[string]interface{}{"option": true}},
     }, {
         "option= on",
-        map[string]bool{"option": true},
+        map[string]map[string]bool{"default":map[string]bool{"option": true}},
     },
     // Ints from spec
     {
-        "canonical: 685230",
-        map[string]interface{}{"canonical": 685230},
+        "canonical= 685230",
+        map[string]map[string]interface{}{"default":map[string]interface{}{"canonical": 685230}},
     }, {
-        "decimal: +685_230",
-        map[string]interface{}{"decimal": 685230},
+        "decimal= +685_230",
+        map[string]map[string]interface{}{"default":map[string]interface{}{"decimal": 685230}},
     }, {
-        "octal: 02472256",
-        map[string]interface{}{"octal": 685230},
+        "octal = 02472256",
+        map[string]map[string]interface{}{"default":map[string]interface{}{"octal": 685230}},
     }, {
-        "hexa: 0x_0A_74_AE",
-        map[string]interface{}{"hexa": 685230},
+        "hexa =  0x_0A_74_AE",
+        map[string]map[string]interface{}{"default":map[string]interface{}{"hexa": 685230}},
     }, {
-        "bin: 0b1010_0111_0100_1010_1110",
-        map[string]interface{}{"bin": 685230},
+        "bin= 0b1010_0111_0100_1010_1110",
+        map[string]map[string]interface{}{"default":map[string]interface{}{"bin": 685230}},
     }, {
-        "bin: -0b101010",
-        map[string]interface{}{"bin": -42},
+        "bin= -0b101010",
+        map[string]map[string]interface{}{"default":map[string]interface{}{"bin": -42}},
     }, {
-        "decimal: +685_230",
-        map[string]int{"decimal": 685230},
+        "decimal= +685_230",
+        map[string]map[string]int{"default":map[string]int{"decimal": 685230}},
     },
 
     // Nulls from spec
     {
         "empty=",
-        map[string]interface{}{"empty": nil},
+        map[string]map[string]interface{}{"default":map[string]interface{}{"empty": nil}},
     }, {
         "canonical= ~",
-        map[string]interface{}{"canonical": nil},
+        map[string]map[string]interface{}{"default":map[string]interface{}{"canonical": nil}},
     }, {
         "english= null",
-        map[string]interface{}{"english": nil},
+        map[string]map[string]interface{}{"default":map[string]interface{}{"english": nil}},
     }, {
         "~= null key",
-        map[interface{}]string{nil: "null key"},
+        map[string]map[interface{}]string{"default":map[interface{}]string{nil: "null key"}},
     }, {
         "empty=",
-        map[string]*bool{"empty": nil},
+        map[string]map[string]*bool{"default":map[string]*bool{"empty": nil}},
     },
 
     // section conversions.
@@ -287,7 +281,6 @@ var unmarshalTests = []struct {
     }, {
         "v= 'B'",
         map[string]interface{}{"v": "B"},
-*/
 	},
 }
 

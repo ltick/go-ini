@@ -2,6 +2,7 @@ package ini
 
 import (
 	"fmt"
+    "bytes"
 )
 
 // Introduction
@@ -405,12 +406,12 @@ func ini_parser_fetch_next_token(parser *ini_parser_t) bool {
 		}
 		if parser.buffer[parser.buffer_pos] == '\'' {
 			// Is it a single-quoted scalar?
-			return ini_parser_fetch_element_value(parser, true)
+			return ini_parser_fetch_section_value(parser, true)
 		} else if parser.buffer[parser.buffer_pos] == '"' {
 			// Is it a double-quoted scalar?
-			return ini_parser_fetch_element_value(parser, false)
+			return ini_parser_fetch_section_value(parser, false)
 		} else {
-			return ini_parser_fetch_plain_element_value(parser)
+			return ini_parser_fetch_plain_section_value(parser)
 		}
 	}
 	for is_blank(parser.buffer, parser.buffer_pos) {
@@ -418,10 +419,10 @@ func ini_parser_fetch_next_token(parser *ini_parser_t) bool {
 	}
 	if parser.buffer[parser.buffer_pos] == '\'' {
 		// Is it a single-quoted scalar?
-		return ini_parser_fetch_element_key(parser, true)
+		return ini_parser_fetch_section_key(parser, true)
 	} else if parser.buffer[parser.buffer_pos] == '"' {
 		// Is it a double-quoted scalar?
-		return ini_parser_fetch_element_key(parser, false)
+		return ini_parser_fetch_section_key(parser, false)
 	} else {
 		return ini_parser_fetch_plain_section_key(parser)
 	}
@@ -514,7 +515,7 @@ func ini_parser_fetch_section(parser *ini_parser_t) bool {
 // Produce the KEY token.
 func ini_parser_fetch_plain_section_key(parser *ini_parser_t) bool {
 	// key must start with alpha([0-9a-zA-Z_-])
-	if !is_alpha(parser.buffer, parser.buffer_pos) {
+	if !is_alpha(parser.buffer, parser.buffer_pos) && parser.buffer[parser.buffer_pos] != '~' {
 		return ini_parser_set_scanner_error(parser,
 			"while scanning for the section key", parser.mark,
 			"found character("+string([]byte{parser.buffer[parser.buffer_pos]})+") that cannot start for any section key")
@@ -536,9 +537,9 @@ func ini_parser_fetch_plain_section_key(parser *ini_parser_t) bool {
 }
 
 // Produce the NODE token.
-func ini_parser_fetch_element_key(parser *ini_parser_t, single bool) bool {
+func ini_parser_fetch_section_key(parser *ini_parser_t, single bool) bool {
 	// key must start with alpha([0-9a-zA-Z_-])
-	if !is_alpha(parser.buffer, parser.buffer_pos+1) {
+	if !is_alpha(parser.buffer, parser.buffer_pos+1) && parser.buffer[parser.buffer_pos+1] != '~' {
 		return ini_parser_set_scanner_error(parser,
 			"while scanning for the section key", parser.mark,
 			"found character("+string([]byte{parser.buffer[parser.buffer_pos+1]})+") that cannot start for any section key")
@@ -560,7 +561,7 @@ func ini_parser_fetch_element_key(parser *ini_parser_t, single bool) bool {
 }
 
 // Produce the VALUE(...,plain) token.
-func ini_parser_fetch_plain_element_value(parser *ini_parser_t) bool {
+func ini_parser_fetch_plain_section_value(parser *ini_parser_t) bool {
 	var token ini_token_t
 	if !ini_parser_scan_plain_scalar(parser, &token) {
 		return false
@@ -570,7 +571,7 @@ func ini_parser_fetch_plain_element_value(parser *ini_parser_t) bool {
 }
 
 // Produce the VALUE token.
-func ini_parser_fetch_element_value(parser *ini_parser_t, single bool) bool {
+func ini_parser_fetch_section_value(parser *ini_parser_t, single bool) bool {
 	var token ini_token_t
 	if !ini_parser_scan_scalar(parser, &token, single) {
 		return false
@@ -601,13 +602,9 @@ func ini_parser_scan_plain_scalar(parser *ini_parser_t, token *ini_token_t) bool
 		if parser.buffer[parser.buffer_pos] == '#' {
 			break
 		}
-		// Consume blank characters.
-		for is_blank(parser.buffer, parser.buffer_pos) {
-			skip(parser)
-		}
 
 		// Consume non-break characters.
-		for !is_blankz(parser.buffer, parser.buffer_pos) {
+		for !is_breakz(parser.buffer, parser.buffer_pos) {
 			// Check for indicators that may end a plain scalar.
 			if parser.buffer[parser.buffer_pos] == ':' || parser.buffer[parser.buffer_pos] == '=' ||
 				parser.buffer[parser.buffer_pos] == '[' || parser.buffer[parser.buffer_pos] == ']' {
@@ -621,16 +618,14 @@ func ini_parser_scan_plain_scalar(parser *ini_parser_t, token *ini_token_t) bool
 				return false
 			}
 		}
-
-		// Consume blank characters.
-		for is_blank(parser.buffer, parser.buffer_pos) {
-			skip(parser)
-		}
-
-		// Is it the end?
-		if !is_break(parser.buffer, parser.buffer_pos) {
-			break
-		}
+        
+        // Trim blank characters.
+        s = bytes.Trim(s, " ")
+        
+        // Is it the end?
+        if !is_break(parser.buffer, parser.buffer_pos) {
+            break
+        }
 	}
 	end_mark := parser.mark
 

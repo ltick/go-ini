@@ -69,11 +69,11 @@ func ini_parser_state_machine(parser *ini_parser_t, event *ini_event_t) bool {
 	case ini_PARSE_SECTION_END_STATE:
 		return ini_parser_parse_section_end(parser, event)
 	case ini_PARSE_SECTION_FIRST_KEY_STATE:
-		return ini_parser_parse_element_key(parser, event, true)
+		return ini_parser_parse_section_key(parser, event, true)
 	case ini_PARSE_SECTION_KEY_STATE:
-		return ini_parser_parse_element_key(parser, event, false)
+		return ini_parser_parse_section_key(parser, event, false)
 	case ini_PARSE_SECTION_VALUE_STATE:
-		return ini_parser_parse_element_value(parser, event)
+		return ini_parser_parse_section_value(parser, event)
 	default:
 		panic("invalid parser state")
 	}
@@ -239,13 +239,14 @@ func ini_parser_parse_section_end(parser *ini_parser_t, event *ini_event_t) bool
 	return true
 }
 
-func ini_parser_parse_element_key(parser *ini_parser_t, event *ini_event_t, first bool) bool {
-	//defer trace("ini_parser_parse_element_key")
+func ini_parser_parse_section_key(parser *ini_parser_t, event *ini_event_t, first bool) bool {
+	//defer trace("ini_parser_parse_section_key")
 
 	token := peek_token(parser)
 	if token == nil {
 		return false
 	}
+	
 	if token.typ == ini_SECTION_KEY_TOKEN {
 		skip_token(parser)
 		start_mark := token.start_mark
@@ -283,8 +284,8 @@ func ini_parser_parse_element_key(parser *ini_parser_t, event *ini_event_t, firs
 // Parse the productions:
 // properties           ::= (KEY = VALUE)
 //
-func ini_parser_parse_element_value(parser *ini_parser_t, event *ini_event_t) bool {
-	//defer trace("ini_parser_parse_element_value")()
+func ini_parser_parse_section_value(parser *ini_parser_t, event *ini_event_t) bool {
+	//defer trace("ini_parser_parse_section_value")()
 
 	token := peek_token(parser)
 	if token == nil {

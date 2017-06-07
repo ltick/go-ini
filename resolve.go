@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"unicode/utf8"
+    "fmt"
 )
 
 type resolveMapItem struct {
@@ -24,9 +25,9 @@ func init() {
 	for _, c := range "0123456789" {
 		t[int(c)] = 'D' // Digit
 	}
-	for _, c := range "yYnNtTfFoO~" {
-		t[int(c)] = 'M' // In map
-	}
+    for _, c := range "yYnNtTfFoO~" {
+        t[int(c)] = 'M' // In map
+    }
 	t[int('.')] = '.' // Float (potentially in map)
 
 	var resolveMapList = []struct {
@@ -63,10 +64,13 @@ func analyzeTag(in string) (tag string) {
     if hint != 0 {
         // Handle things we can lookup in a map.
         if item, ok := resolveMap[in]; ok {
+            fmt.Println(item.tag)
             return item.tag
         }
     
         switch hint {
+        case 'M':
+            // We've already checked the map above.
         case '.':
             // Not in the map, so maybe a normal float.
             _, err := strconv.ParseFloat(in, 64)
