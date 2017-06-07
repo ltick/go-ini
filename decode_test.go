@@ -22,40 +22,40 @@ var unmarshalTests = []struct {
 		&struct{}{},
 	}, {
 		"v= hi",
-		map[string]string{"v": "hi"},
+		map[string]map[string]string{"default":map[string]string{"v": "hi"}},
 	}, {
         "v= hi",
-        map[string]interface{}{"v": "hi"},
+        map[string]map[string]interface{}{"default":map[string]interface{}{"v": "hi"}},
     }, {
         "v = true",
-        map[string]string{"v": "true"},
+        map[string]map[string]string{"default":map[string]string{"v": "true"}},
     }, {
         "v =true",
-        map[string]interface{}{"v": true},
+        map[string]map[string]interface{}{"default":map[string]interface{}{"v": true}},
     }, {
         "v = 10",
-        map[string]interface{}{"v": 10},
+        map[string]map[string]interface{}{"default":map[string]interface{}{"v": 10}},
     }, {
         "v= 0b10",
-        map[string]interface{}{"v": 2},
+        map[string]map[string]interface{}{"default":map[string]interface{}{"v": 2}},
     }, {
         "v= 0xA",
-        map[string]interface{}{"v": 10},
+        map[string]map[string]interface{}{"default":map[string]interface{}{"v": 10}},
     }, {
         "v= 4294967296",
-        map[string]int64{"v": 4294967296},
+        map[string]map[string]int64{"default":map[string]int64{"v": 4294967296}},
     }, {
         "v= 0.1",
-        map[string]interface{}{"v": 0.1},
+        map[string]map[string]interface{}{"default":map[string]interface{}{"v": 0.1}},
     }, {
         "v= .1",
-        map[string]interface{}{"v": 0.1},
+        map[string]map[string]interface{}{"default":map[string]interface{}{"v": 0.1}},
     }, {
         "v= -10",
-        map[string]interface{}{"v": -10},
+        map[string]map[string]interface{}{"default":map[string]interface{}{"v": -10}},
     }, {
         "v= -.1",
-        map[string]interface{}{"v": -0.1},
+        map[string]map[string]interface{}{"default":map[string]interface{}{"v": -0.1}},
         /*
     },
 

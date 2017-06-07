@@ -122,27 +122,26 @@ func (p *parser) document() *node {
 	n := p.node(documentNode)
 	p.doc = n
 	p.skip()
-	childNode := p.parse()
-	if p.event.typ != ini_DOCUMENT_END_EVENT {
-		panic("expected ini_DOCUMENT_END_EVENT, got " + p.event.event_type())
-	}
-	if childNode != nil {
-		n.children = append(n.children, childNode)
-	}
+    for p.event.typ != ini_DOCUMENT_END_EVENT {
+        if p.event.typ == ini_SECTION_ENTRY_EVENT {
+            child := p.parse()
+            if p.event.typ == ini_SECTION_INHERIT_EVENT {
+                for i := len(p.doc.children) - 1; i >= 0; i-- {
+                    section := p.doc.children[i]
+                    if section.value == string(p.event.value) {
+                        n.children = section.children
+                    }
+                }
+            }
+            n.children = append(n.children, child)
+        }
+    }
 	return n
 }
 
 func (p *parser) section() *node {
 	n := p.node(sectionNode)
 	n.value = string(p.event.value)
-	if p.event.typ == ini_SECTION_INHERIT_EVENT {
-		for i := len(p.doc.children) - 1; i >= 0; i-- {
-			section := p.doc.children[i]
-			if section.value == string(p.event.value) {
-				n.children = section.children
-			}
-		}
-	}
 	// until next ini_SECTION_ENTRY_EVENT
 	p.skip()
 	for p.event.typ != ini_SECTION_END_EVENT {
@@ -275,9 +274,57 @@ func (d *decoder) unmarshal(n *node, out reflect.Value) (good bool) {
 }
 
 func (d *decoder) document(n *node, out reflect.Value) (good bool) {
-	if len(n.children) == 1 {
+	if len(n.children) > 0 {
 		d.doc = n
-		d.unmarshal(n.children[0], out)
+		switch out.Kind() {
+		case reflect.Struct:
+			return d.mappingStruct(n, out)
+		case reflect.Map:
+		// okay
+		case reflect.Interface:
+			if d.mapType.Kind() == reflect.Map {
+				iface := out
+				out = reflect.MakeMap(d.mapType)
+				iface.Set(out)
+				return true
+			} else {
+				d.terror(n, ini_SECTION_TAG, out)
+				return false
+			}
+		default:
+			d.terror(n, ini_SECTION_TAG, out)
+			return false
+		}
+		outt := out.Type()
+		kt := outt.Key()
+		et := outt.Elem()
+
+		mapType := d.mapType
+		if outt.Key() == ifaceType && outt.Elem() == ifaceType {
+			d.mapType = outt
+		}
+
+		if out.IsNil() {
+			out.Set(reflect.MakeMap(outt))
+		}
+		l := len(n.children)
+		for i := 0; i < l; i += 1 {
+			k := reflect.New(kt).Elem()
+			e := reflect.New(et).Elem()
+			if d.unmarshal(n.children[i], e) {
+				kkind := k.Kind()
+				if kkind == reflect.Interface {
+					kkind = k.Elem().Kind()
+				}
+				if kkind == reflect.Map || kkind == reflect.Slice {
+					failf("invalid section key: %#v", k.Interface())
+				}
+				k.SetString(n.children[i].value)
+				out.SetMapIndex(k, e)
+			}
+
+		}
+        d.mapType = mapType
 		return true
 	}
 	return false
@@ -497,7 +544,6 @@ func (d *decoder) mappingStruct(n *node, out reflect.Value) (good bool) {
 	}
 	name := settableValueOf("")
 	l := len(n.children)
-
 	var inlineMap reflect.Value
 	var elemType reflect.Type
 	if sinfo.InlineMap != -1 {

@@ -451,58 +451,51 @@ func ini_parser_decrease_level(parser *ini_parser_t) bool {
 func ini_parser_fetch_section(parser *ini_parser_t) bool {
 	// Eat '['
 	if parser.buffer[parser.buffer_pos] == '[' {
-		var s []byte
 		start_mark := parser.mark
-		s = read(parser, s)
-		if parser.unread < 1 && !ini_parser_update_buffer(parser, 1) {
-			return false
-		}
+		skip(parser)
 		end_mark := parser.mark
 		token := ini_token_t{
 			typ:        ini_SECTION_START_TOKEN,
 			start_mark: start_mark,
 			end_mark:   end_mark,
-			value:      s,
+			value:      []byte("["),
 		}
 		ini_insert_token(parser, -1, &token)
-	}
-	// try to scan name.
-	for parser.buffer[parser.buffer_pos] != ']' && parser.buffer[parser.buffer_pos] != ':' &&
-		parser.buffer[parser.buffer_pos] != '\n' {
-		ini_parser_fetch_plain_element_value(parser)
-	}
-	// Check for ':' and eat it.
-	if parser.buffer[parser.buffer_pos] == ':' {
-		var s []byte
-		start_mark := parser.mark
-		s = read(parser, s)
-		if parser.unread < 1 && !ini_parser_update_buffer(parser, 1) {
+
+		// try to scan name.
+		if !ini_parser_fetch_plain_scalar(parser) {
 			return false
 		}
+	}
+
+	// Check for ':' and eat it.
+	if parser.buffer[parser.buffer_pos] == ':' {
+		start_mark := parser.mark
+		skip(parser)
 		end_mark := parser.mark
 		token := ini_token_t{
 			typ:        ini_SECTION_INHERIT_TOKEN,
 			start_mark: start_mark,
 			end_mark:   end_mark,
-			value:      s,
+			value:      []byte(":"),
 		}
 		ini_insert_token(parser, -1, &token)
+		// try to scan inherit name.
+		if !ini_parser_fetch_plain_scalar(parser) {
+			return false
+		}
 	}
 
 	// Check for ']' and eat it.
 	if parser.buffer[parser.buffer_pos] == ']' {
-		var s []byte
 		start_mark := parser.mark
-		s = read(parser, s)
-		if parser.unread < 1 && !ini_parser_update_buffer(parser, 1) {
-			return false
-		}
+		skip(parser)
 		end_mark := parser.mark
 		token := ini_token_t{
 			typ:        ini_SECTION_END_TOKEN,
 			start_mark: start_mark,
 			end_mark:   end_mark,
-			value:      s,
+			value:      []byte("]"),
 		}
 		ini_insert_token(parser, -1, &token)
 	} else if is_crlf(parser.buffer, parser.buffer_pos) {
