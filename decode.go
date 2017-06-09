@@ -125,15 +125,15 @@ func (p *parser) document() *node {
     for p.event.typ != ini_DOCUMENT_END_EVENT {
         if p.event.typ == ini_SECTION_ENTRY_EVENT {
             child := p.parse()
-            if p.event.typ == ini_SECTION_INHERIT_EVENT {
-                for i := len(p.doc.children) - 1; i >= 0; i-- {
-                    section := p.doc.children[i]
-                    if section.value == string(p.event.value) {
-                        n.children = section.children
-                    }
+           
+            n.children = append(n.children, child)
+        } else if p.event.typ == ini_SECTION_INHERIT_EVENT {
+            for i := len(p.doc.children) - 1; i >= 0; i-- {
+                section := p.doc.children[i]
+                if section.value == string(p.event.value) {
+                    n.children = section.children
                 }
             }
-            n.children = append(n.children, child)
         }
     }
 	return n

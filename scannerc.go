@@ -384,6 +384,7 @@ func ini_parser_fetch_next_token(parser *ini_parser_t) bool {
 	}
 
 	// Is it the section start indicator?
+    fmt.Println(parser.mark.column)
 	if parser.mark.column == 0 && parser.buffer[parser.buffer_pos] == '[' {
 		return ini_parser_fetch_section(parser)
 	}
@@ -451,6 +452,7 @@ func ini_parser_decrease_level(parser *ini_parser_t) bool {
 // Produce the SECTION token.
 func ini_parser_fetch_section(parser *ini_parser_t) bool {
 	// Eat '['
+	fmt.Println(parser.buffer[parser.buffer_pos])
 	if parser.buffer[parser.buffer_pos] == '[' {
 		start_mark := parser.mark
 		skip(parser)
@@ -567,6 +569,11 @@ func ini_parser_fetch_plain_section_value(parser *ini_parser_t) bool {
 		return false
 	}
 	ini_insert_token(parser, -1, &token)
+    // force new line
+    if parser.mark.column != 0 {
+        parser.mark.column = 0
+        parser.mark.line++
+    }
 	return true
 }
 
@@ -577,6 +584,11 @@ func ini_parser_fetch_section_value(parser *ini_parser_t, single bool) bool {
 		return false
 	}
 	ini_insert_token(parser, -1, &token)
+    // force new line
+    if parser.mark.column != 0 {
+        parser.mark.column = 0
+        parser.mark.line++
+    }
 	return true
 }
 
