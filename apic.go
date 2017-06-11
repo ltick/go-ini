@@ -145,11 +145,10 @@ func ini_document_end_event_initialize(event *ini_event_t) bool {
 }
 
 // Create SECTION-ENTRY.
-func ini_section_event_initialize(event *ini_event_t, value []byte, inherit []byte) bool {
+func ini_section_event_initialize(event *ini_event_t, value []byte) bool {
 	*event = ini_event_t{
 		typ: ini_SECTION_ENTRY_EVENT,
         value:   value,
-        inherit: inherit,
 	}
 	return true
 }

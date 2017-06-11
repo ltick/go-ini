@@ -384,7 +384,6 @@ func ini_parser_fetch_next_token(parser *ini_parser_t) bool {
 	}
 
 	// Is it the section start indicator?
-    fmt.Println(parser.mark.column)
 	if parser.mark.column == 0 && parser.buffer[parser.buffer_pos] == '[' {
 		return ini_parser_fetch_section(parser)
 	}

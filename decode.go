@@ -7,6 +7,7 @@ import (
 	"math"
 	"reflect"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -122,32 +123,35 @@ func (p *parser) document() *node {
 	n := p.node(documentNode)
 	p.doc = n
 	p.skip()
-    for p.event.typ != ini_DOCUMENT_END_EVENT {
-        if p.event.typ == ini_SECTION_ENTRY_EVENT {
-            child := p.parse()
-           
-            n.children = append(n.children, child)
-        } else if p.event.typ == ini_SECTION_INHERIT_EVENT {
-            for i := len(p.doc.children) - 1; i >= 0; i-- {
-                section := p.doc.children[i]
-                if section.value == string(p.event.value) {
-                    n.children = section.children
-                }
-            }
-        }
-    }
+	for p.event.typ != ini_DOCUMENT_END_EVENT {
+		if p.event.typ == ini_SECTION_ENTRY_EVENT {
+			n.children = append(n.children, p.parse())
+			p.skip()
+		}
+	}
 	return n
 }
 
 func (p *parser) section() *node {
 	n := p.node(sectionNode)
 	n.value = string(p.event.value)
+	//inherit
+	if strings.Contains(n.value, ":") {
+		section_items := strings.SplitN(n.value, ":", 2)
+		l := len(p.doc.children)
+		for j := 0; j < l; j += 1 {
+			if p.doc.children[j].value == section_items[1] {
+                for _, child := range p.doc.children[j].children {
+                    n.children = append(n.children, child)
+                }
+			}
+		}
+	}
 	// until next ini_SECTION_ENTRY_EVENT
 	p.skip()
-	for p.event.typ != ini_SECTION_END_EVENT {
+	for p.event.typ != ini_SECTION_ENTRY_EVENT {
 		n.children = append(n.children, p.parse(), p.parse())
 	}
-	p.skip()
 	return n
 }
 
@@ -161,7 +165,7 @@ func (p *parser) comment() *node {
 func (p *parser) scalar() *node {
 	n := p.node(scalarNode)
 	n.value = string(p.event.value)
-    n.tag = string(p.event.tag)
+	n.tag = string(p.event.tag)
 	p.skip()
 	return n
 }
@@ -311,6 +315,12 @@ func (d *decoder) document(n *node, out reflect.Value) (good bool) {
 		for i := 0; i < l; i += 1 {
 			k := reflect.New(kt).Elem()
 			e := reflect.New(et).Elem()
+			section_key := n.children[i].value
+			//inherit
+			if strings.Contains(n.children[i].value, ":") {
+				section_items := strings.SplitN(n.children[i].value, ":", 2)
+				section_key = section_items[0]
+			}
 			if d.unmarshal(n.children[i], e) {
 				kkind := k.Kind()
 				if kkind == reflect.Interface {
@@ -319,12 +329,12 @@ func (d *decoder) document(n *node, out reflect.Value) (good bool) {
 				if kkind == reflect.Map || kkind == reflect.Slice {
 					failf("invalid section key: %#v", k.Interface())
 				}
-				k.SetString(n.children[i].value)
+				k.SetString(section_key)
 				out.SetMapIndex(k, e)
 			}
 
 		}
-        d.mapType = mapType
+		d.mapType = mapType
 		return true
 	}
 	return false
@@ -356,11 +366,11 @@ func (d *decoder) section(n *node, out reflect.Value) (good bool) {
 			iface := out
 			out = reflect.MakeMap(d.mapType)
 			iface.Set(out)
-            return true
+			return true
 		} else {
-            d.terror(n, ini_SECTION_TAG, out)
-            return false
-        }
+			d.terror(n, ini_SECTION_TAG, out)
+			return false
+		}
 	default:
 		d.terror(n, ini_SECTION_TAG, out)
 		return false

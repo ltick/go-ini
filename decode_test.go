@@ -7,6 +7,7 @@ import (
 	"tick-config-ini"
 	"fmt"
 	"strconv"
+    "math"
 )
 
 var failingErr = errors.New("failingErr")
@@ -132,43 +133,33 @@ var unmarshalTests = []struct {
         map[string]map[string]*bool{"default":map[string]*bool{"empty": nil}},
     },
 
-    // section conversions.
-    {
-        "[section]\nhello= world",
-        map[string]interface{}{"section": map[string]string{"hello": "world"}},
-    }, {
-        "hello1= world[section:default]\nhello= world",
-        map[string]interface{}{"default": map[string]string{"hello1": "world"}, "section": map[string]string{"hello1": "world", "hello": "world"}},
-        /*
-    },
-
     // Some cross type conversions
     {
         "v= 42",
-        map[string]uint{"v": 42},
+        map[string]map[string]uint{"default":map[string]uint{"v": 42}},
     }, {
         "v= -42",
-        map[string]uint{},
+        map[string]map[string]uint{"default":map[string]uint{}},
     }, {
         "v= 4294967296",
-        map[string]uint64{"v": 4294967296},
+        map[string]map[string]uint64{"default":map[string]uint64{"v": 4294967296}},
     }, {
         "v= -4294967296",
-        map[string]uint64{},
+        map[string]map[string]uint64{"default":map[string]uint64{}},
     },
 
     // int
     {
         "int_max= 2147483647",
-        map[string]int{"int_max": math.MaxInt32},
+        map[string]map[string]int{"default":map[string]int{"int_max": math.MaxInt32}},
     },
     {
         "int_min= -2147483648",
-        map[string]int{"int_min": math.MinInt32},
+        map[string]map[string]int{"default":map[string]int{"int_min": math.MinInt32}},
     },
     {
         "int_overflow= 9223372036854775808", // math.MaxInt64 + 1
-        map[string]int{},
+        map[string]map[string]int{"default":map[string]int{}},
     },
 
     // int64
@@ -281,8 +272,16 @@ var unmarshalTests = []struct {
     }, {
         "v= 'B'",
         map[string]interface{}{"v": "B"},
-        */
 	},
+    
+    // section conversions.
+    {
+        "[section]\nhello= world",
+        map[string]map[string]string{"section": map[string]string{"hello": "world"}},
+    }, {
+        "hello1= world[section:default]\nhello= world",
+        map[string]map[string]interface{}{"default": map[string]interface{}{"hello1": "world"}, "section": map[string]interface{}{"hello1": "world", "hello": "world"}},
+    },
 }
 
 type M map[interface{}]interface{}

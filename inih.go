@@ -73,6 +73,7 @@ const (
 	ini_SECTION_START_TOKEN   // A SECTION-START token.
 	ini_SECTION_INHERIT_TOKEN // A SECTION INHERIT token.
 	ini_SECTION_END_TOKEN     // A SECTION-END token.
+    ini_SECTION_ENTRY_TOKEN     // A SECTION-ENTRY token.
 
 	ini_SECTION_KEY_TOKEN   // An KEY token.
 	ini_SECTION_VALUE_TOKEN // An VALUE token.
@@ -92,6 +93,8 @@ func (tt ini_token_type_t) String() string {
 		return "ini_DOCUMENT_END_TOKEN"
 	case ini_SECTION_START_TOKEN:
 		return "ini_SECTION_START_TOKEN"
+	case ini_SECTION_ENTRY_TOKEN:
+		return "ini_SECTION_ENTRY_TOKEN"
 	case ini_SECTION_END_TOKEN:
 		return "ini_SECTION_END_TOKEN"
 	case ini_SECTION_INHERIT_TOKEN:
@@ -138,8 +141,7 @@ const (
 	ini_DOCUMENT_START_EVENT  // A DOCUMENT-START event.
 	ini_DOCUMENT_END_EVENT    // A DOCUMENT-END event.
 	ini_SECTION_ENTRY_EVENT   // A SECTION-ENTRY event.
-    ini_SECTION_INHERIT_EVENT // A SECTION-INHERIT event.
-	ini_SECTION_END_EVENT     // A SECTION-END event.
+    ini_SECTION_END_EVENT   // A SECTION-ENTRY event.
 
 	ini_SCALAR_EVENT  // An SCALAR_ event.
 	ini_COMMENT_EVENT // A COMMENT event.
@@ -160,9 +162,6 @@ type ini_event_t struct {
     // The tag (for ini_SCALAR_EVENT).
     tag []byte
 
-	// for ini_SECTION_INHERIT_EVENT.
-	inherit []byte
-
 	// The style (for ini_ELEMENT_START_EVENT).
 	style ini_style_t
 }
@@ -177,10 +176,8 @@ func (e *ini_event_t) event_type() string {
 		return "ini_DOCUMENT_END_EVENT"
 	case ini_SECTION_ENTRY_EVENT:
 		return "ini_SECTION_ENTRY_EVENT"
-	case ini_SECTION_INHERIT_EVENT:
-		return "ini_SECTION_INHERIT_EVENT"
-	case ini_SECTION_END_EVENT:
-		return "ini_SECTION_END_EVENT"
+    case ini_SECTION_END_EVENT:
+        return "ini_SECTION_END_EVENT"
 	case ini_SCALAR_EVENT:
 		return "ini_SCALAR_EVENT"
 	case ini_COMMENT_EVENT:
@@ -202,6 +199,7 @@ const (
 	ini_BINARY_TAG = "binary"
     
     ini_SECTION_TAG = "section"
+	ini_SECTION_INHERIT_TAG = "section_inherit"
     
     ini_DEFAULT_SCALAR_TAG   = ini_STR_TAG // The default scalar tag is str
 )
@@ -277,7 +275,6 @@ const (
 	ini_PARSE_SECTION_FIRST_KEY_STATE   // Expect a SECTION-KEY.
 	ini_PARSE_SECTION_KEY_STATE         // Expect a SECTION-KEY.
 	ini_PARSE_SECTION_VALUE_STATE       // Expect a SECTION-VALUE.
-	ini_PARSE_SECTION_END_STATE         // Expect a SECTION-VALUE.
 	ini_PARSE_COMMENT_START_STATE       // Expect COMMENT-START.
 	ini_PARSE_COMMENT_CONTENT_STATE     // Expect the content of a comment.
 	ini_PARSE_COMMENT_END_STATE         // Expect COMMENT-END.
@@ -301,8 +298,6 @@ func (ps ini_parser_state_t) String() string {
 		return "ini_PARSE_SECTION_KEY_STATE"
 	case ini_PARSE_SECTION_VALUE_STATE:
 		return "ini_PARSE_SECTION_VALUE_STATE"
-	case ini_PARSE_SECTION_END_STATE:
-		return "ini_PARSE_SECTION_END_STATE"
 	case ini_PARSE_COMMENT_START_STATE:
 		return "ini_PARSE_COMMENT_START_STATE"
 	case ini_PARSE_COMMENT_CONTENT_STATE:
