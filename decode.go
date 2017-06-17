@@ -14,7 +14,6 @@ import (
 const (
 	documentNode = 1 << iota
 	sectionNode
-    sectionMapNode
 	commentNode
 	scalarNode
 )
@@ -151,7 +150,9 @@ func (p *parser) section() *node {
 	// until next ini_SECTION_ENTRY_EVENT
 	p.skip()
 	for p.event.typ != ini_SECTION_ENTRY_EVENT {
-		n.children = append(n.children, p.parse(), p.parse())
+        childNode := p.parse()
+        fmt.Println(childNode.kind)
+		n.children = append(n.children, childNode)
 	}
 	return n
 }

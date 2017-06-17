@@ -72,11 +72,10 @@ const (
 
 	ini_SECTION_START_TOKEN   // A SECTION-START token.
 	ini_SECTION_INHERIT_TOKEN // A SECTION INHERIT token.
-	ini_SECTION_END_TOKEN     // A SECTION-END token.
     ini_SECTION_ENTRY_TOKEN     // A SECTION-ENTRY token.
 
-	ini_SECTION_KEY_TOKEN   // An KEY token.
-    ini_SECTION_KEY_MAP_TOKEN   // An KEY MAP token.
+	ini_SECTION_PARENT_KEY_TOKEN   // An MAP_KEY token.
+    ini_SECTION_KEY_TOKEN   // An KEY token.
 	ini_SECTION_VALUE_TOKEN // An VALUE token.
 	ini_SCALAR_TOKEN        // A SCALAR token.
 
@@ -96,12 +95,10 @@ func (tt ini_token_type_t) String() string {
 		return "ini_SECTION_START_TOKEN"
 	case ini_SECTION_ENTRY_TOKEN:
 		return "ini_SECTION_ENTRY_TOKEN"
-	case ini_SECTION_END_TOKEN:
-		return "ini_SECTION_END_TOKEN"
 	case ini_SECTION_INHERIT_TOKEN:
 		return "ini_SECTION_INHERIT_TOKEN"
-	case ini_SECTION_KEY_MAP_TOKEN:
-		return "ini_SECTION_KEY_MAP_TOKEN"
+    case ini_SECTION_PARENT_KEY_TOKEN:
+        return "ini_SECTION_PARENT_KEY_TOKEN"
 	case ini_SECTION_KEY_TOKEN:
 		return "ini_SECTION_KEY_TOKEN"
 	case ini_SECTION_VALUE_TOKEN:
@@ -274,8 +271,7 @@ const (
 	ini_PARSE_DOCUMENT_END_STATE        // Expect DOCUMENT-START.
 	ini_PARSE_SECTION_FIRST_ENTRY_STATE // Expect SECTION-FIRST-ENTRY.
 	ini_PARSE_SECTION_ENTRY_STATE       // Expect SECTION-ENTRY.
-	ini_PARSE_SECTION_FIRST_KEY_STATE   // Expect a SECTION-KEY.
-	ini_PARSE_SECTION_KEY_STATE         // Expect a SECTION-KEY.
+	ini_PARSE_SECTION_KEY_STATE   // Expect a SECTION-KEY.
 	ini_PARSE_SECTION_VALUE_STATE       // Expect a SECTION-VALUE.
 	ini_PARSE_COMMENT_START_STATE       // Expect COMMENT-START.
 	ini_PARSE_COMMENT_CONTENT_STATE     // Expect the content of a comment.
@@ -292,8 +288,6 @@ func (ps ini_parser_state_t) String() string {
 		return "ini_PARSE_SECTION_FIRST_ENTRY_STATE"
 	case ini_PARSE_SECTION_ENTRY_STATE:
 		return "ini_PARSE_SECTION_ENTRY_STATE"
-	case ini_PARSE_SECTION_FIRST_KEY_STATE:
-		return "ini_PARSE_SECTION_FIRST_KEY_STATE"
 	case ini_PARSE_SECTION_KEY_STATE:
 		return "ini_PARSE_SECTION_KEY_STATE"
 	case ini_PARSE_SECTION_VALUE_STATE:
