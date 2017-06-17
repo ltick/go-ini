@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"unicode/utf8"
+    "fmt"
 )
 
 type resolveMapItem struct {
@@ -63,6 +64,7 @@ func analyzeTag(in string) (tag string) {
     if hint != 0 {
         // Handle things we can lookup in a map.
         if item, ok := resolveMap[in]; ok {
+            fmt.Println(item.tag)
             return item.tag
         }
     

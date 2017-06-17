@@ -14,7 +14,6 @@ import (
 const (
 	documentNode = 1 << iota
 	sectionNode
-    sectionMapNode
 	commentNode
 	scalarNode
 )

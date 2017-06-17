@@ -56,7 +56,7 @@ func ini_parser_set_parser_error_context(parser *ini_parser_t, context string, c
 
 // State dispatcher.
 func ini_parser_state_machine(parser *ini_parser_t, event *ini_event_t) bool {
-	//trace("ini_parser_state_machine", "state:", parser.state.String())
+	trace("ini_parser_state_machine", "state:", parser.state.String())
 	switch parser.state {
 	case ini_PARSE_DOCUMENT_START_STATE:
 		return ini_parser_parse_document_start(parser, event)
@@ -236,6 +236,7 @@ func ini_parser_parse_section_key(parser *ini_parser_t, event *ini_event_t, firs
 	if token == nil {
 		return false
 	}
+
 	if token.typ == ini_SECTION_KEY_TOKEN {
 		skip_token(parser)
 		start_mark := token.start_mark
