@@ -137,7 +137,7 @@ func ini_emitter_need_more_events(emitter *ini_emitter_t) bool {
 	case ini_DOCUMENT_START_EVENT:
 		accumulate = 1
 		break
-	case ini_SECTION_ENTRY_EVENT:
+	case ini_SECTION_START_EVENT:
 		accumulate = 2
 		break
 	case ini_COMMENT_EVENT:
@@ -152,7 +152,7 @@ func ini_emitter_need_more_events(emitter *ini_emitter_t) bool {
 	var level int
 	for i := emitter.events_head; i < len(emitter.events); i++ {
 		switch emitter.events[i].typ {
-		case ini_DOCUMENT_START_EVENT, ini_SECTION_ENTRY_EVENT:
+		case ini_DOCUMENT_START_EVENT, ini_SECTION_START_EVENT:
 			level++
 		}
 		if level == 0 {
@@ -295,8 +295,8 @@ func ini_emitter_check_empty_section(emitter *ini_emitter_t) bool {
 	if len(emitter.events)-emitter.events_head < 2 {
 		return false
 	}
-	if emitter.events[emitter.events_head].typ == ini_SECTION_ENTRY_EVENT &&
-			(emitter.events[emitter.events_head+1].typ == ini_SECTION_ENTRY_EVENT ||  emitter.events[emitter.events_head+2].typ == ini_SECTION_ENTRY_EVENT) {
+	if emitter.events[emitter.events_head].typ == ini_SECTION_START_EVENT &&
+			(emitter.events[emitter.events_head+1].typ == ini_SECTION_START_EVENT ||  emitter.events[emitter.events_head+2].typ == ini_SECTION_START_EVENT) {
 		return true
 	}
 	return false

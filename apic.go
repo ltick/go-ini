@@ -147,7 +147,7 @@ func ini_document_end_event_initialize(event *ini_event_t) bool {
 // Create SECTION-ENTRY.
 func ini_section_event_initialize(event *ini_event_t, value []byte) bool {
 	*event = ini_event_t{
-		typ: ini_SECTION_ENTRY_EVENT,
+		typ: ini_SECTION_START_EVENT,
         value:   value,
 	}
 	return true

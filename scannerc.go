@@ -385,7 +385,13 @@ func ini_parser_fetch_next_token(parser *ini_parser_t) bool {
 
 	// Is it the section start indicator?
 	if parser.mark.column == 0 && parser.buffer[parser.buffer_pos] == '[' {
-		return ini_parser_fetch_section(parser)
+		return ini_parser_fetch_section_start(parser)
+	}
+	if parser.buffer[parser.buffer_pos] == ':' {
+		return ini_parser_fetch_section_inherit(parser)
+	}
+	if parser.buffer[parser.buffer_pos] == ']' {
+		return ini_parser_fetch_section_entry(parser)
 	}
 
 	// Is it the item value indicator?
@@ -393,7 +399,20 @@ func ini_parser_fetch_next_token(parser *ini_parser_t) bool {
 		return ini_parser_fetch_section_value(parser)
 	}
 
-	return ini_parser_fetch_section_key(parser)
+	// Produce the SCALAR(...,plain) token.
+	if parser.buffer[parser.buffer_pos] == '\'' {
+		return ini_parser_fetch_scalar(parser)
+	}
+	if parser.buffer[parser.buffer_pos] == '"' {
+		return ini_parser_fetch_scalar(parser)
+	}
+
+	if !(is_blankz(parser.buffer, parser.buffer_pos) || parser.buffer[parser.buffer_pos] == '[' ||
+		parser.buffer[parser.buffer_pos] == ':' || parser.buffer[parser.buffer_pos] == ']' ||
+		parser.buffer[parser.buffer_pos] == '=' || parser.buffer[parser.buffer_pos] == '\'' ||
+		parser.buffer[parser.buffer_pos] == '"') {
+		return ini_parser_fetch_plain_scalar(parser)
+	}
 
 	// If we don't determine the token type so far, it is an error.
 	return ini_parser_set_scanner_error(parser,
@@ -417,235 +436,99 @@ func ini_parser_decrease_level(parser *ini_parser_t) bool {
 }
 
 // Produce the SECTION token.
-func ini_parser_fetch_section(parser *ini_parser_t) bool {
-	// Eat '['
-	if parser.buffer[parser.buffer_pos] == '[' {
-		start_mark := parser.mark
-		skip(parser)
-		end_mark := parser.mark
-		section_start_token := ini_token_t{
-			typ:        ini_SECTION_START_TOKEN,
-			start_mark: start_mark,
-			end_mark:   end_mark,
-			value:      []byte("["),
-		}
-		ini_insert_token(parser, -1, &section_start_token)
-
-		// Produce the SCALAR(...,plain) token.
-		// Create the SCALAR token and append it to the queue.
-		var scalar_token ini_token_t
-		if !ini_parser_scan_plain_scalar(parser, &scalar_token) {
-			return false
-		}
-		ini_insert_token(parser, -1, &scalar_token)
-	}
-
-	// Check for ':' and eat it.
-	if parser.buffer[parser.buffer_pos] == ':' {
-		start_mark := parser.mark
-		skip(parser)
-		end_mark := parser.mark
-		section_inherit_token := ini_token_t{
-			typ:        ini_SECTION_INHERIT_TOKEN,
-			start_mark: start_mark,
-			end_mark:   end_mark,
-			value:      []byte(":"),
-		}
-		ini_insert_token(parser, -1, &section_inherit_token)
-		// Produce the SCALAR(...,plain) token.
-		// Create the SCALAR token and append it to the queue.
-		var scalar_token ini_token_t
-		if !ini_parser_scan_plain_scalar(parser, &scalar_token) {
-			return false
-		}
-		ini_insert_token(parser, -1, &scalar_token)
-	}
-
-	// Check for ']' and eat it.
-	if parser.buffer[parser.buffer_pos] == ']' {
-		start_mark := parser.mark
-		skip(parser)
-		end_mark := parser.mark
-		token := ini_token_t{
-			typ:        ini_SECTION_ENTRY_TOKEN,
-			start_mark: start_mark,
-			end_mark:   end_mark,
-			value:      []byte("]"),
-		}
-		ini_insert_token(parser, -1, &token)
-	} else if is_crlf(parser.buffer, parser.buffer_pos) {
-		token := ini_token_t{
-			typ:        ini_SECTION_ENTRY_TOKEN,
-			start_mark: parser.mark,
-			end_mark:   parser.mark,
-			value:      parser.buffer[parser.mark.index:parser.mark.index],
-		}
-		ini_insert_token(parser, -1, &token)
-	}
-
-	return true
-}
-
-// Produce the KEY token.
-func ini_parser_fetch_section_key(parser *ini_parser_t) bool {
-	for is_blank(parser.buffer, parser.buffer_pos) {
-		parser.buffer_pos++
-	}
-	// Produce the SCALAR(...,plain) token.
-	var scalar_token ini_token_t
-	if parser.buffer[parser.buffer_pos] == '\'' {
-		// key must start with alpha([0-9a-zA-Z_-])
-		if !is_alpha(parser.buffer, parser.buffer_pos+1) && parser.buffer[parser.buffer_pos+1] != '~' {
-			return ini_parser_set_scanner_error(parser,
-				"while scanning for the section key", parser.mark,
-				"found character("+string([]byte{parser.buffer[parser.buffer_pos+1]})+") that cannot start for any section key")
-		}
-		// Is it a single-quoted scalar?
-		if !ini_parser_scan_scalar(parser, &scalar_token, true) {
-			return false
-		}
-	} else if parser.buffer[parser.buffer_pos] == '"' {
-		// key must start with alpha([0-9a-zA-Z_-])
-		if !is_alpha(parser.buffer, parser.buffer_pos+1) && parser.buffer[parser.buffer_pos+1] != '~' {
-			return ini_parser_set_scanner_error(parser,
-				"while scanning for the section key", parser.mark,
-				"found character("+string([]byte{parser.buffer[parser.buffer_pos+1]})+") that cannot start for any section key")
-		}
-		// Is it a double-quoted scalar?
-		if !ini_parser_scan_scalar(parser, &scalar_token, false) {
-			return false
-		}
-	} else {
-		// key must start with alpha([0-9a-zA-Z_-])
-		if !is_alpha(parser.buffer, parser.buffer_pos) && parser.buffer[parser.buffer_pos] != '~' {
-			return ini_parser_set_scanner_error(parser,
-				"while scanning for the section key", parser.mark,
-				"found character("+string([]byte{parser.buffer[parser.buffer_pos]})+") that cannot start for any section key")
-		}
-		// Is it a plain scalar?
-		if !ini_parser_scan_plain_scalar(parser, &scalar_token) {
-			return false
-		}
-	}
-
-	// Create the SCALAR token and append it to the queue.
-	keys := bytes.Split(scalar_token.value, []byte("."))
-	key_len := len(keys)
-	key_start_mark := scalar_token.start_mark
-	key_end_mark := scalar_token.end_mark
-	for i := 0; i < key_len; i++ {
-		// key_token
-        key_start_mark = key_end_mark
-        if i < key_len-1 {
-            key_token := ini_token_t{
-                typ:        ini_SECTION_PARENT_KEY_TOKEN,
-                start_mark: key_start_mark,
-                end_mark:   key_start_mark,
-            }
-            ini_insert_token(parser, -1, &key_token)
-        } else {
-            key_token := ini_token_t{
-                typ:        ini_SECTION_KEY_TOKEN,
-                start_mark: key_start_mark,
-                end_mark:   key_start_mark,
-            }
-            ini_insert_token(parser, -1, &key_token)
-        }
-		// scalar_token
-		key_start_mark = key_end_mark
-		key_end_mark.index = key_start_mark.index + len(keys[i])
-		scalar_token := ini_token_t{
-			typ:        ini_SCALAR_TOKEN,
-			start_mark: key_start_mark,
-			end_mark:   key_end_mark,
-			value:      keys[0],
-			style:      ini_PLAIN_SCALAR_STYLE,
-		}
-		ini_insert_token(parser, -1, &scalar_token)
-	}
-	return true
-}
-
-// Produce the VALUE(...,plain) token.
-func ini_parser_fetch_section_value(parser *ini_parser_t) bool {
-	// Eat '='
+func ini_parser_fetch_section_start(parser *ini_parser_t) bool {
+	// Consume the token.
 	start_mark := parser.mark
 	skip(parser)
 	end_mark := parser.mark
-	section_value_token := ini_token_t{
-		typ:        ini_SECTION_VALUE_TOKEN,
+	section_start_token := ini_token_t{
+		typ:        ini_SECTION_START_TOKEN,
 		start_mark: start_mark,
 		end_mark:   end_mark,
-		value:      []byte("="),
 	}
-	ini_insert_token(parser, -1, &section_value_token)
+	ini_insert_token(parser, -1, &section_start_token)
+	// Produce the SCALAR(...,plain) token.
+	// Create the SCALAR token and append it to the queue.
+	var scalar_token ini_token_t
+	if !ini_parser_scan_plain_scalar(parser, &scalar_token) {
+		return false
+	}
+	ini_insert_token(parser, -1, &scalar_token)
 
+	return true
+}
+func ini_parser_fetch_section_inherit(parser *ini_parser_t) bool {
+	// Consume the token.
+	start_mark := parser.mark
+	skip(parser)
+	end_mark := parser.mark
+	section_inherit_token := ini_token_t{
+		typ:        ini_SECTION_INHERIT_TOKEN,
+		start_mark: start_mark,
+		end_mark:   end_mark,
+	}
+	ini_insert_token(parser, -1, &section_inherit_token)
+	// Produce the SCALAR(...,plain) token.
+	// Create the SCALAR token and append it to the queue.
+	var scalar_token ini_token_t
+	if !ini_parser_scan_plain_scalar(parser, &scalar_token) {
+		return false
+	}
+	ini_insert_token(parser, -1, &scalar_token)
+	return true
+}
+func ini_parser_fetch_section_entry(parser *ini_parser_t) bool {
+	// Consume the token.
+	start_mark := parser.mark
+	skip(parser)
+	end_mark := parser.mark
+	token := ini_token_t{
+		typ:        ini_SECTION_ENTRY_TOKEN,
+		start_mark: start_mark,
+		end_mark:   end_mark,
+	}
+	ini_insert_token(parser, -1, &token)
+	return true
+}
+
+func ini_parser_fetch_plain_key(parser *ini_parser_t) bool {
 	for is_blank(parser.buffer, parser.buffer_pos) {
 		parser.buffer_pos++
 	}
-	var scalar_token ini_token_t
-	if parser.buffer[parser.buffer_pos] == '\'' {
-		// Is it a single-quoted scalar?
-		if !ini_parser_scan_scalar(parser, &scalar_token, true) {
-			return false
-		}
-	} else if parser.buffer[parser.buffer_pos] == '"' {
-		// Is it a double-quoted scalar?
-		if !ini_parser_scan_scalar(parser, &scalar_token, false) {
-			return false
-		}
-	} else {
-		// Is it a plain scalar?
-		if !ini_parser_scan_plain_scalar(parser, &scalar_token) {
-			return false
-		}
+	// key must start with alpha([0-9a-zA-Z_-])
+	if !is_alpha(parser.buffer, parser.buffer_pos) && parser.buffer[parser.buffer_pos] != '~' {
+		return ini_parser_set_scanner_error(parser,
+			"while scanning for the section key", parser.mark,
+			"found character("+string([]byte{parser.buffer[parser.buffer_pos]})+") that cannot start for any section key")
 	}
-	ini_insert_token(parser, -1, &scalar_token)
-	// force new line
-	if parser.mark.column != 0 {
-		parser.mark.column = 0
-		parser.mark.line++
+	// Is it a single-quoted scalar?
+	var token ini_token_t
+	if !ini_parser_scan_plain_key(parser, &token) {
+		return false
 	}
+	ini_insert_token(parser, -1, &token)
 	return true
 }
 
 // Scan a plain scalar.
-func ini_parser_scan_plain_scalar(parser *ini_parser_t, token *ini_token_t) bool {
+func ini_parser_scan_plain_key(parser *ini_parser_t, token *ini_token_t) bool {
 	start_mark := parser.mark
-
 	var s []byte
 	// Consume the content of the plain scalar.
 	for {
-		// Check for a comment.
-		if parser.buffer[parser.buffer_pos] == '#' {
+		// Check for indicators that may end a plain scalar.
+		if !is_breakz(parser.buffer, parser.buffer_pos) || parser.buffer[parser.buffer_pos] == '.' || parser.buffer[parser.buffer_pos] == '=' {
 			break
 		}
-
-		// Consume non-break characters.
-		for !is_breakz(parser.buffer, parser.buffer_pos) {
-			// Check for indicators that may end a plain scalar.
-			if parser.buffer[parser.buffer_pos] == ':' || parser.buffer[parser.buffer_pos] == '=' ||
-				parser.buffer[parser.buffer_pos] == '[' || parser.buffer[parser.buffer_pos] == ']' {
-				break
-			}
-
-			// Copy the character.
-			s = read(parser, s)
-			if parser.unread < 1 && !ini_parser_update_buffer(parser, 1) {
-				return false
-			}
-		}
-
-		// Trim blank characters.
-		s = bytes.Trim(s, " ")
-
-		// Is it the end?
-		if !is_break(parser.buffer, parser.buffer_pos) {
-			break
+		// Copy the character.
+		s = read(parser, s)
+		if parser.unread < 1 && !ini_parser_update_buffer(parser, 1) {
+			return false
 		}
 	}
 	end_mark := parser.mark
-
+	// Trim blank characters.
+	s = bytes.Trim(s, " ")
 	// Create a token.
 	*token = ini_token_t{
 		typ:        ini_SCALAR_TOKEN,
@@ -658,6 +541,52 @@ func ini_parser_scan_plain_scalar(parser *ini_parser_t, token *ini_token_t) bool
 	return true
 }
 
+// Produce the VALUE(...,plain) token.
+func ini_parser_fetch_section_mapping(parser *ini_parser_t) bool {
+	// Consume the token.
+	start_mark := parser.mark
+	skip(parser)
+	end_mark := parser.mark
+	token := ini_token_t{
+		typ:        ini_MAPPING_TOKEN,
+		start_mark: start_mark,
+		end_mark:   end_mark,
+	}
+	ini_insert_token(parser, -1, &token)
+	return true
+}
+
+// Produce the VALUE(...,plain) token.
+func ini_parser_fetch_section_value(parser *ini_parser_t) bool {
+	// Consume the token.
+	start_mark := parser.mark
+	skip(parser)
+	end_mark := parser.mark
+	token := ini_token_t{
+		typ:        ini_VALUE_TOKEN,
+		start_mark: start_mark,
+		end_mark:   end_mark,
+	}
+	ini_insert_token(parser, -1, &token)
+	return true
+}
+
+func ini_parser_fetch_scalar(parser *ini_parser_t) bool {
+	// key must start with alpha([0-9a-zA-Z_-])
+	if !is_alpha(parser.buffer, parser.buffer_pos+1) && parser.buffer[parser.buffer_pos+1] != '~' {
+		return ini_parser_set_scanner_error(parser,
+			"while scanning for the section key", parser.mark,
+			"found character("+string([]byte{parser.buffer[parser.buffer_pos+1]})+") that cannot start for any section key")
+	}
+	// Is it a single-quoted scalar?
+	var token ini_token_t
+	if !ini_parser_scan_scalar(parser, &token, true) {
+		return false
+	}
+	ini_insert_token(parser, -1, &token)
+	return true
+}
+
 // Scan a node value.
 func ini_parser_scan_scalar(parser *ini_parser_t, token *ini_token_t, single bool) bool {
 	start_mark := parser.mark
@@ -665,14 +594,6 @@ func ini_parser_scan_scalar(parser *ini_parser_t, token *ini_token_t, single boo
 	var s []byte
 	// Consume the content of the quoted scalar.
 	for {
-		// Check for a comment.
-		if parser.buffer[parser.buffer_pos] == '#' {
-			break
-		}
-		if parser.buffer[parser.buffer_pos] == ':' || parser.buffer[parser.buffer_pos] == '=' ||
-			parser.buffer[parser.buffer_pos] == '[' || parser.buffer[parser.buffer_pos] == ']' {
-			break
-		}
 		if single {
 			if parser.buffer[parser.buffer_pos] == '\'' && parser.buffer[parser.buffer_pos+1] == '\'' {
 				// Is is an escaped single quote.
@@ -713,10 +634,10 @@ func ini_parser_scan_scalar(parser *ini_parser_t, token *ini_token_t, single boo
 				skip(parser)
 				// It is a non-escaped non-blank character.
 				for parser.buffer[parser.buffer_pos] != '"' {
-					s = read(parser, s)
 					if parser.unread < 1 && !ini_parser_update_buffer(parser, 1) {
 						return false
 					}
+					s = read(parser, s)
 				}
 				break
 			} else if parser.buffer[parser.buffer_pos] == '\\' && is_break(parser.buffer, parser.buffer_pos+1) {
@@ -865,6 +786,59 @@ func ini_parser_scan_scalar(parser *ini_parser_t, token *ini_token_t, single boo
 	if !single {
 		token.style = ini_DOUBLE_QUOTED_SCALAR_STYLE
 	}
+	return true
+}
+
+func ini_parser_fetch_plain_scalar(parser *ini_parser_t) bool {
+	for is_blank(parser.buffer, parser.buffer_pos) {
+		parser.buffer_pos++
+	}
+	// key must start with alpha([0-9a-zA-Z_-])
+	if !is_alpha(parser.buffer, parser.buffer_pos) && parser.buffer[parser.buffer_pos] != '~' {
+		return ini_parser_set_scanner_error(parser,
+			"while scanning for the section key", parser.mark,
+			"found character("+string([]byte{parser.buffer[parser.buffer_pos]})+") that cannot start for any section key")
+	}
+	// Is it a single-quoted scalar?
+	var token ini_token_t
+	if !ini_parser_scan_plain_scalar(parser, &token) {
+		return false
+	}
+	ini_insert_token(parser, -1, &token)
+	return true
+}
+
+// Scan a plain scalar.
+func ini_parser_scan_plain_scalar(parser *ini_parser_t, token *ini_token_t) bool {
+	start_mark := parser.mark
+	var s []byte
+	// Consume the content of the plain scalar.
+	for {
+		// Check for indicators that may end a plain scalar.
+		if !is_breakz(parser.buffer, parser.buffer_pos) || parser.buffer[parser.buffer_pos] == ':' || parser.buffer[parser.buffer_pos] == '=' ||
+			parser.buffer[parser.buffer_pos] == '[' || parser.buffer[parser.buffer_pos] == ']' {
+			break
+		}
+
+		// Copy the character.
+		s = read(parser, s)
+		if parser.unread < 1 && !ini_parser_update_buffer(parser, 1) {
+			return false
+		}
+	}
+	// Trim blank characters.
+	s = bytes.Trim(s, " ")
+	end_mark := parser.mark
+
+	// Create a token.
+	*token = ini_token_t{
+		typ:        ini_SCALAR_TOKEN,
+		start_mark: start_mark,
+		end_mark:   end_mark,
+		value:      s,
+		style:      ini_PLAIN_SCALAR_STYLE,
+	}
+
 	return true
 }
 

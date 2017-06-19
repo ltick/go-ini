@@ -15,6 +15,7 @@ const (
 	documentNode = 1 << iota
 	sectionNode
 	commentNode
+    mappingNode
 	scalarNode
 )
 
@@ -97,8 +98,10 @@ func (p *parser) parse() *node {
 	switch p.event.typ {
 	case ini_DOCUMENT_START_EVENT:
 		return p.document()
-	case ini_SECTION_ENTRY_EVENT:
+	case ini_SECTION_START_EVENT:
 		return p.section()
+	case ini_MAPPING_EVENT:
+		return p.mapping()
 	case ini_SCALAR_EVENT:
 		return p.scalar()
 	case ini_COMMENT_EVENT:
@@ -124,7 +127,7 @@ func (p *parser) document() *node {
 	p.doc = n
 	p.skip()
 	for p.event.typ != ini_DOCUMENT_END_EVENT {
-		if p.event.typ == ini_SECTION_ENTRY_EVENT {
+		if p.event.typ == ini_SECTION_START_EVENT {
 			n.children = append(n.children, p.parse())
 			p.skip()
 		}
@@ -133,27 +136,34 @@ func (p *parser) document() *node {
 }
 
 func (p *parser) section() *node {
-	n := p.node(sectionNode)
-	n.value = string(p.event.value)
-	//inherit
-	if strings.Contains(n.value, ":") {
-		section_items := strings.SplitN(n.value, ":", 2)
-		l := len(p.doc.children)
-		for j := 0; j < l; j += 1 {
-			if p.doc.children[j].value == section_items[1] {
+    n := p.node(sectionNode)
+    n.value = string(p.event.value)
+    //inherit
+    if strings.Contains(n.value, ":") {
+        section_items := strings.SplitN(n.value, ":", 2)
+        l := len(p.doc.children)
+        for j := 0; j < l; j += 1 {
+            if p.doc.children[j].value == section_items[1] {
                 for _, child := range p.doc.children[j].children {
                     n.children = append(n.children, child)
                 }
-			}
-		}
-	}
-	// until next ini_SECTION_ENTRY_EVENT
-	p.skip()
-	for p.event.typ != ini_SECTION_ENTRY_EVENT {
-        childNode := p.parse()
-        fmt.Println(childNode.kind)
-		n.children = append(n.children, childNode)
-	}
+            }
+        }
+    }
+    // until next ini_SECTION_START_EVENT
+    p.skip()
+    for p.event.typ != ini_SECTION_START_EVENT {
+        n.children = append(n.children, p.parse())
+    }
+    return n
+}
+
+func (p *parser) mapping() *node {
+    n := p.node(mappingNode)
+    n.value = string(p.event.value)
+    for p.event.typ != ini_SECTION_START_EVENT {
+        n.children = append(n.children, p.parse())
+    }
 	return n
 }
 
