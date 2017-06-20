@@ -513,10 +513,22 @@ func ini_parser_fetch_key(parser *ini_parser_t) bool {
 	// Produce the SCALAR(...,plain) token.
 	var key_token ini_token_t
 	if parser.buffer[parser.buffer_pos] == '\'' {
+		// key must start with alpha([0-9a-zA-Z_-])
+		if !is_alpha(parser.buffer, parser.buffer_pos+1) && parser.buffer[parser.buffer_pos+1] != '~' {
+			return ini_parser_set_scanner_error(parser,
+				"while scanning for the scalar", parser.mark,
+				"found character("+string([]byte{parser.buffer[parser.buffer_pos+1]})+") that cannot start for any key")
+		}
 		if !ini_parser_scan_scalar(parser, &key_token, true) {
 			return false
 		}
 	} else if parser.buffer[parser.buffer_pos] == '"' {
+		// key must start with alpha([0-9a-zA-Z_-])
+		if !is_alpha(parser.buffer, parser.buffer_pos) && parser.buffer[parser.buffer_pos] != '~' {
+			return ini_parser_set_scanner_error(parser,
+				"while scanning for the plain scalar", parser.mark,
+				"found character("+string([]byte{parser.buffer[parser.buffer_pos]})+") that cannot start for any value")
+		}
 		if !ini_parser_scan_scalar(parser, &key_token, false) {
 			return false
 		}
@@ -587,26 +599,20 @@ func ini_parser_fetch_value(parser *ini_parser_t) bool {
 		parser.buffer_pos++
 	}
 	// Produce the SCALAR(...,plain) token.
-	if parser.buffer[parser.buffer_pos] == '\'' || parser.buffer[parser.buffer_pos] == '"'{
-        // key must start with alpha([0-9a-zA-Z_-])
-        if !is_alpha(parser.buffer, parser.buffer_pos+1) && parser.buffer[parser.buffer_pos+1] != '~' {
-            return ini_parser_set_scanner_error(parser,
-                "while scanning for the scalar", parser.mark,
-                "found character("+string([]byte{parser.buffer[parser.buffer_pos+1]})+") that cannot start for any section key")
-        }
-        // Is it a single-quoted scalar?
-        if !ini_parser_scan_scalar(parser, &token, true) {
+	if parser.buffer[parser.buffer_pos] == '\''{
+		// Is it a single-quoted scalar?
+		if !ini_parser_scan_scalar(parser, &token, true) {
+			return false
+		}
+		ini_insert_token(parser, -1, &token)
+	} else if parser.buffer[parser.buffer_pos] == '"'{
+        // Is it a double-quoted scalar?
+        if !ini_parser_scan_scalar(parser, &token, false) {
             return false
         }
         ini_insert_token(parser, -1, &token)
 	} else {
-        // key must start with alpha([0-9a-zA-Z_-])
-        if !is_alpha(parser.buffer, parser.buffer_pos) && parser.buffer[parser.buffer_pos] != '~' {
-            return ini_parser_set_scanner_error(parser,
-                "while scanning for the plain scalar", parser.mark,
-                "found character("+string([]byte{parser.buffer[parser.buffer_pos]})+") that cannot start for any section key")
-        }
-        // Is it a single-quoted scalar?
+        // Is it a plain scalar?
         if !ini_parser_scan_plain_scalar(parser, &token) {
             return false
         }
