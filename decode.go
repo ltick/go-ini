@@ -14,9 +14,10 @@ import (
 const (
 	documentNode = 1 << iota
 	sectionNode
-	commentNode
-    mappingNode
+    keyNode
+    valueNode
 	scalarNode
+    commentNode
 )
 
 type node struct {
@@ -100,8 +101,10 @@ func (p *parser) parse() *node {
 		return p.document()
 	case ini_SECTION_START_EVENT:
 		return p.section()
-	case ini_MAPPING_EVENT:
-		return p.mapping()
+	case ini_KEY_EVENT:
+		return p.key()
+    case ini_VALUE_EVENT:
+        return p.value()
 	case ini_SCALAR_EVENT:
 		return p.scalar()
 	case ini_COMMENT_EVENT:
@@ -136,50 +139,73 @@ func (p *parser) document() *node {
 }
 
 func (p *parser) section() *node {
-    n := p.node(sectionNode)
-    n.value = string(p.event.value)
-    //inherit
-    if strings.Contains(n.value, ":") {
-        section_items := strings.SplitN(n.value, ":", 2)
-        l := len(p.doc.children)
-        for j := 0; j < l; j += 1 {
-            if p.doc.children[j].value == section_items[1] {
-                for _, child := range p.doc.children[j].children {
-                    n.children = append(n.children, child)
+	thisNode := p.node(sectionNode)
+	thisNode.value = string(p.event.value)
+	// inherit
+	if strings.Contains(thisNode.value, ":") {
+		section_items := strings.SplitN(thisNode.value, ":", 2)
+		l := len(p.doc.children)
+		for j := 0; j < l; j += 1 {
+			if p.doc.children[j].value == section_items[1] {
+				for _, child := range p.doc.children[j].children {
+					thisNode.children = append(thisNode.children, child)
+				}
+			}
+		}
+	}
+	// until next ini_SECTION_START_EVENT
+	p.skip()
+    tempNode := thisNode
+	for p.event.typ != ini_SECTION_START_EVENT {
+        childNode := p.parse()
+        if childNode.kind == keyNode {
+            keyExist := false
+            i:=0
+            for ;i<len(tempNode.children);i++ {
+                if childNode.kind == tempNode.children[i].kind && childNode.value == tempNode.children[i].value{
+                    keyExist = true
                 }
             }
+            tempNode.children = append(tempNode.children, childNode)
+            if !keyExist {
+                tempNode = tempNode.children[i]
+            } else {
+                tempNode = childNode
+            }
+        } else if childNode.kind == valueNode {
+            tempNode.children = append(tempNode.children, childNode)
         }
-    }
-    // until next ini_SECTION_START_EVENT
-    p.skip()
-    for p.event.typ != ini_SECTION_START_EVENT {
-        n.children = append(n.children, p.parse())
-    }
-    return n
-}
-
-func (p *parser) mapping() *node {
-    n := p.node(mappingNode)
-    n.value = string(p.event.value)
-    for p.event.typ != ini_SECTION_START_EVENT {
-        n.children = append(n.children, p.parse())
-    }
-	return n
+	}
+	return thisNode
 }
 
 func (p *parser) comment() *node {
-	n := p.node(commentNode)
-	n.value = string(p.event.value)
+    thisNode := p.node(commentNode)
+    thisNode.value = string(p.event.value)
 	p.skip()
-	return n
+	return thisNode
+}
+
+func (p *parser) key() *node {
+    p.skip()
+    thisNode := p.parse()
+    thisNode.kind = keyNode
+    return thisNode
+}
+
+func (p *parser) value() *node {
+    p.skip()
+    thisNode := p.parse()
+    thisNode.kind = valueNode
+    return thisNode
 }
 
 func (p *parser) scalar() *node {
-	n := p.node(scalarNode)
-	n.value = string(p.event.value)
-	n.tag = string(p.event.tag)
+    thisNode := p.node(scalarNode)
+    thisNode.value = string(p.event.value)
+    thisNode.tag = string(p.event.tag)
 	p.skip()
-	return n
+	return thisNode
 }
 
 // ----------------------------------------------------------------------------
@@ -281,6 +307,10 @@ func (d *decoder) unmarshal(n *node, out reflect.Value) (good bool) {
 	switch n.kind {
 	case sectionNode:
 		good = d.section(n, out)
+    case keyNode:
+        good = d.key(n, out)
+    case valueNode:
+        good = d.value(n, out)
 	case scalarNode:
 		good = d.scalar(n, out)
 	default:
@@ -400,9 +430,9 @@ func (d *decoder) section(n *node, out reflect.Value) (good bool) {
 		out.Set(reflect.MakeMap(outt))
 	}
 	l := len(n.children)
-	for i := 0; i < l; i += 2 {
-		k := reflect.New(kt).Elem()
-		if d.unmarshal(n.children[i], k) {
+	for i := 0; i < l; i++ {
+		c := reflect.New(kt).Elem()
+		if d.unmarshal(n.children[i], c) {
 			kkind := k.Kind()
 			if kkind == reflect.Interface {
 				kkind = k.Elem().Kind()
@@ -418,6 +448,14 @@ func (d *decoder) section(n *node, out reflect.Value) (good bool) {
 	}
 	d.mapType = mapType
 	return true
+}
+
+func (d *decoder) key(n *node, out reflect.Value) (good bool) {
+    return d.mapping(n, out)
+}
+
+func (d *decoder) value(n *node, out reflect.Value) (good bool) {
+    return d.scalar(n, out)
 }
 
 func (d *decoder) scalar(n *node, out reflect.Value) (good bool) {
@@ -557,6 +595,92 @@ func (d *decoder) scalar(n *node, out reflect.Value) (good bool) {
 		d.terror(n, tag, out)
 	}
 	return good
+}
+
+func (d *decoder) mapping(n *node, out reflect.Value) (good bool) {
+    switch out.Kind() {
+    case reflect.Struct:
+        return d.mappingStruct(n, out)
+    case reflect.Slice:
+        return d.mappingSlice(n, out)
+    case reflect.Map:
+    // okay
+    case reflect.Interface:
+        if d.mapType.Kind() == reflect.Map {
+            iface := out
+            out = reflect.MakeMap(d.mapType)
+            iface.Set(out)
+        } else {
+            slicev := reflect.New(d.mapType).Elem()
+            if !d.mappingSlice(n, slicev) {
+                return false
+            }
+            out.Set(slicev)
+            return true
+        }
+    default:
+        d.terror(n, ini_MAP_TAG, out)
+        return false
+    }
+    outt := out.Type()
+    kt := outt.Key()
+    et := outt.Elem()
+
+    mapType := d.mapType
+    if outt.Key() == ifaceType && outt.Elem() == ifaceType {
+        d.mapType = outt
+    }
+
+    if out.IsNil() {
+        out.Set(reflect.MakeMap(outt))
+    }
+    l := len(n.children)
+    for i := 0; i < l; i += 2 {
+        k := reflect.New(kt).Elem()
+        if d.unmarshal(n.children[i], k) {
+            kkind := k.Kind()
+            if kkind == reflect.Interface {
+                kkind = k.Elem().Kind()
+            }
+            if kkind == reflect.Map || kkind == reflect.Slice {
+                failf("invalid map key: %#v", k.Interface())
+            }
+            e := reflect.New(et).Elem()
+            if d.unmarshal(n.children[i+1], e) {
+                out.SetMapIndex(k, e)
+            }
+        }
+    }
+    d.mapType = mapType
+    return true
+}
+
+
+func (d *decoder) mappingSlice(n *node, out reflect.Value) (good bool) {
+    outt := out.Type()
+    if outt.Elem() != mapItemType {
+        d.terror(n, ini_MAP_TAG, out)
+        return false
+    }
+
+    mapType := d.mapType
+    d.mapType = outt
+
+    var slice []MapItem
+    var l = len(n.children)
+    for i := 0; i < l; i += 2 {
+        item := MapItem{}
+        k := reflect.ValueOf(&item.Key).Elem()
+        if d.unmarshal(n.children[i], k) {
+            v := reflect.ValueOf(&item.Value).Elem()
+            if d.unmarshal(n.children[i+1], v) {
+                slice = append(slice, item)
+            }
+        }
+    }
+    out.Set(reflect.ValueOf(slice))
+    d.mapType = mapType
+    return true
 }
 
 func (d *decoder) mappingStruct(n *node, out reflect.Value) (good bool) {

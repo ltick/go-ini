@@ -74,7 +74,7 @@ const (
 	ini_SECTION_INHERIT_TOKEN // A SECTION-INHERIT token.
     ini_SECTION_ENTRY_TOKEN // A SECTION-ENTRY token.
     
-    ini_MAPPING_TOKEN   // An MAPPING token.
+	ini_KEY_TOKEN // An VALUE token.
 	ini_VALUE_TOKEN // An VALUE token.
 	ini_SCALAR_TOKEN        // A SCALAR token.
 
@@ -94,8 +94,8 @@ func (tt ini_token_type_t) String() string {
 		return "ini_SECTION_START_TOKEN"
 	case ini_SECTION_INHERIT_TOKEN:
 		return "ini_SECTION_INHERIT_TOKEN"
-    case ini_MAPPING_TOKEN:
-        return "ini_MAPPING_TOKEN"
+	case ini_KEY_TOKEN:
+		return "ini_KEY_TOKEN"
 	case ini_VALUE_TOKEN:
 		return "ini_VALUE_TOKEN"
 	case ini_SCALAR_TOKEN:
@@ -138,7 +138,8 @@ const (
 	ini_SECTION_START_EVENT   // A SECTION-START event.
     ini_SECTION_END_EVENT   // A SECTION-END event.
     
-    ini_MAPPING_EVENT  // An MAPPING event.
+    ini_KEY_EVENT  // An KEY event.
+    ini_VALUE_EVENT  // An VALUE event.
     ini_SCALAR_EVENT  // An SCALAR event.
 	ini_COMMENT_EVENT // A COMMENT event.
 )
@@ -174,8 +175,10 @@ func (e *ini_event_t) event_type() string {
 		return "ini_SECTION_START_EVENT"
     case ini_SECTION_END_EVENT:
         return "ini_SECTION_END_EVENT"
-    case ini_MAPPING_EVENT:
-        return "ini_MAPPING_EVENT"
+    case ini_KEY_EVENT:
+        return "ini_KEY_EVENT"
+    case ini_VALUE_EVENT:
+        return "ini_VALUE_EVENT"
 	case ini_SCALAR_EVENT:
 		return "ini_SCALAR_EVENT"
 	case ini_COMMENT_EVENT:
@@ -195,6 +198,7 @@ const (
 	ini_INT_TAG    = "int"   // The tag 'int' for integer values.
 	ini_FLOAT_TAG  = "float" // The tag 'float' for float values.
 	ini_BINARY_TAG = "binary"
+    ini_MAP_TAG = "map"
     
     ini_SECTION_TAG = "section"
 	ini_SECTION_INHERIT_TAG = "section_inherit"
@@ -269,8 +273,7 @@ const (
 	ini_PARSE_DOCUMENT_END_STATE        // Expect DOCUMENT-START.
 	ini_PARSE_SECTION_FIRST_ENTRY_STATE // Expect SECTION-FIRST-ENTRY.
 	ini_PARSE_SECTION_ENTRY_STATE       // Expect SECTION-ENTRY.
-	ini_PARSE_SECTION_MAP_STATE   // Expect a SECTION-KEY.
-	ini_PARSE_SECTION_VALUE_STATE       // Expect a SECTION-VALUE.
+    ini_PARSE_SECTION_NODE_STATE   // Expect a MAP.
 	ini_PARSE_COMMENT_START_STATE       // Expect COMMENT-START.
 	ini_PARSE_COMMENT_CONTENT_STATE     // Expect the content of a comment.
 	ini_PARSE_COMMENT_END_STATE         // Expect COMMENT-END.
@@ -286,10 +289,8 @@ func (ps ini_parser_state_t) String() string {
 		return "ini_PARSE_SECTION_FIRST_ENTRY_STATE"
 	case ini_PARSE_SECTION_ENTRY_STATE:
 		return "ini_PARSE_SECTION_ENTRY_STATE"
-	case ini_PARSE_SECTION_MAP_STATE:
-		return "ini_PARSE_SECTION_MAP_STATE"
-	case ini_PARSE_SECTION_VALUE_STATE:
-		return "ini_PARSE_SECTION_VALUE_STATE"
+	case ini_PARSE_SECTION_NODE_STATE:
+		return "ini_PARSE_SECTION_NODE_STATE"
 	case ini_PARSE_COMMENT_START_STATE:
 		return "ini_PARSE_COMMENT_START_STATE"
 	case ini_PARSE_COMMENT_CONTENT_STATE:
