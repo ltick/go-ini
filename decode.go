@@ -159,7 +159,8 @@ func (p *parser) section() *node {
 	currentNode := thisNode
 	for p.event.typ != ini_SECTION_START_EVENT {
 		nextNode := p.parse()
-		fmt.Println(nextNode.kind)
+        fmt.Println("xxxxx")
+        fmt.Println(nextNode.kind)
 		if nextNode.kind == keyNode {
 			parentNode = currentNode
 			keyExist := false
@@ -175,10 +176,14 @@ func (p *parser) section() *node {
 				currentNode.children = append(currentNode.children, nextNode)
 				currentNode = nextNode
 			}
+            fmt.Println(currentNode.value)
 		} else if nextNode.kind == valueNode {
 			parentNode.children = append(parentNode.children, nextNode)
 		}
 	}
+	fmt.Println("adas")
+
+	fmt.Println(thisNode.children)
 	return thisNode
 }
 

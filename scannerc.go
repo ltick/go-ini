@@ -424,13 +424,7 @@ func ini_parser_fetch_next_token(parser *ini_parser_t) bool {
 	if parser.buffer[parser.buffer_pos] == '=' {
 		return ini_parser_fetch_value(parser)
 	}
-
 	return ini_parser_fetch_key(parser)
-
-	// If we don't determine the token type so far, it is an error.
-	return ini_parser_set_scanner_error(parser,
-		"while scanning for the next token", parser.mark,
-		"found character that cannot start any token")
 }
 
 // Increase the flow level and resize the simple key list if needed.
