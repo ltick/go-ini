@@ -76,6 +76,7 @@ const (
 	ini_KEY_TOKEN // An VALUE token.
 	ini_VALUE_TOKEN // An VALUE token.
 	ini_SCALAR_TOKEN        // A SCALAR token.
+	ini_MAP_TOKEN        // A MAP token.
 
 	ini_COMMENT_START_TOKEN // A COMMENT-START token.
 	ini_COMMENT_END_TOKEN   // A COMMENT-END token.

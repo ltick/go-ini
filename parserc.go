@@ -231,6 +231,15 @@ func ini_parser_parse_section_node(parser *ini_parser_t, event *ini_event_t) boo
 		} else {
 			return ini_parser_set_parser_error(parser, "did not find expected <scalar>", token.start_mark)
 		}
+	} else if token.typ == ini_MAP_TOKEN {
+		skip_token(parser)
+		parser.state = ini_PARSE_SECTION_NODE_STATE
+		*event = ini_event_t{
+			typ:        ini_MAPPING_EVENT,
+			start_mark: token.start_mark,
+			end_mark:   token.end_mark,
+		}
+		return true
 	} else if token.typ == ini_KEY_TOKEN {
 		skip_token(parser)
 		token := peek_token(parser)

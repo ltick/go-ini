@@ -96,7 +96,6 @@ func (p *parser) fail() {
 }
 
 func (p *parser) parse() *node {
-    fmt.Println(p.event.typ )
 	switch p.event.typ {
 	case ini_DOCUMENT_START_EVENT:
 		return p.document()
@@ -146,6 +145,7 @@ func (p *parser) section() *node {
 	// until next ini_SECTION_START_EVENT
 	p.skip()
 	currentNode := thisNode
+    parentNode := currentNode
 	for p.event.typ != ini_SECTION_START_EVENT {
 		nextNode := p.parse()
 		if nextNode.kind == inheritNode {
@@ -158,25 +158,26 @@ func (p *parser) section() *node {
 					}
 				}
 			}
-		} else if nextNode.kind == mappingNode {
-            fmt.Println("mappingNode")
-			keyExist := false
-			i := 0
-			for ; i < len(currentNode.children); i++ {
-				if nextNode.kind == currentNode.children[i].kind && nextNode.value == currentNode.children[i].value {
-					keyExist = true
+		} else if nextNode.kind == scalarNode {
+			if currentNode.kind == mappingNode {
+				for i := 0; i < len(currentNode.children); i++ {
+					if nextNode.kind == currentNode.children[i].kind && nextNode.value == currentNode.children[i].value {
+						currentNode = currentNode.children[i]
+						break
+					}
+				}
+				currentNode.children = append(currentNode.children, nextNode)
+			} else {
+				parentNode.children = append(parentNode.children, nextNode)
+				if currentNode.kind == scalarNode {
+					currentNode = thisNode
 				}
 			}
-			if keyExist {
-				currentNode = currentNode.children[i]
-			} else {
-				currentNode.children = append(currentNode.children, nextNode)
-				currentNode = nextNode
-			}
-		} else if nextNode.kind == scalarNode {
-			currentNode.children = append(currentNode.children, nextNode)
-			currentNode = thisNode
+		} else if nextNode.kind == mappingNode {
+            parentNode.children = append(parentNode.children, nextNode)
+            parentNode = nextNode
 		}
+        currentNode = nextNode
 	}
 	return thisNode
 }

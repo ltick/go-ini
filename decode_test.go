@@ -314,6 +314,7 @@ func (s *S) TestUnmarshal(c *C) {
         }
         fmt.Println("===")
         fmt.Println(item.data)
+        fmt.Println("---")
         fmt.Println(item.value)
         fmt.Println(value)
         fmt.Println("---")
@@ -322,25 +323,6 @@ func (s *S) TestUnmarshal(c *C) {
         } else {
             c.Assert(value, DeepEquals, item.value)
         }
-		/*
-			if typ.Kind() == reflect.String {
-				if *value.(*string) != item.value {
-					t.Error("TestUnmarshal Failed")
-				}
-			} else if typ.Kind() == reflect.Map {
-				unmarshalValue := value.(map[string]string)
-				for mapKey, mapValue := range item.value.(map[string]string) {
-					unmarshalValueItem, ok := unmarshalValue[mapKey]
-					if !ok || unmarshalValueItem != mapValue {
-						t.Error("TestUnmarshal Failed")
-					}
-				}
-			} else {
-				if value != item.value {
-					t.Error("TestUnmarshal Failed")
-				}
-			}
-		*/
 	}
 }
 

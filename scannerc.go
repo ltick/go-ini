@@ -33,7 +33,8 @@ import (
 //      SECTION-START            		# '['
 //      SECTION-INHERIT     			# ':'
 //      SECTION-ENTRY               	# ']'
-//      KEY                             # '.' or nothing
+//      KEY                             # nothing
+// 		MAP 						    # '.'
 //      VALUE                           # '='
 // 		SCALAR(value,style)             # A scalar.
 //      COMMENT             			# '#', ';'
@@ -49,7 +50,7 @@ import (
 // The first level key of '.' could ignored
 // The following examples illustrate this case:
 //
-// 		1. Implicit(ignore '.') Key and Value
+// 		1. Key and Value
 //
 //			key = value
 //
@@ -60,18 +61,7 @@ import (
 //			VALUE
 //			SCALAR('value', plain)
 //
-// 		2. Explicit Key and Value
-//
-//			.key = value
-//
-//		Tokens:
-//
-//			KEY
-// 			SCALAR('key', plain)
-//			VALUE
-//			SCALAR('value', plain)
-//
-// 		3. Explicit Key and Value
+// 		3.  Map Key and Value
 //
 //		    key1.key = value
 //
@@ -79,6 +69,7 @@ import (
 //
 //			KEY
 // 			SCALAR('key1', plain)
+//          MAP
 //          KEY
 // 			SCALAR('key', plain)
 //			VALUE
@@ -132,7 +123,7 @@ import (
 //          [section]
 //			key1 = "value1"
 //          [another_section]
-//			'.key2' = 'value2'
+//			'key2' = 'value2'
 //
 //      Tokens:
 //
@@ -424,6 +415,7 @@ func ini_parser_fetch_next_token(parser *ini_parser_t) bool {
 	if parser.buffer[parser.buffer_pos] == '=' {
 		return ini_parser_fetch_value(parser)
 	}
+
 	return ini_parser_fetch_key(parser)
 }
 
@@ -563,47 +555,47 @@ func ini_parser_fetch_key(parser *ini_parser_t) bool {
 			return false
 		}
 	}
-
-	explicit := false
-	if key_token.value[0] == '.' {
-		key_token.value = key_token.value[1:]
-		explicit = true
-	}
+    
 	keys := bytes.Split(key_token.value, []byte("."))
 	key_len := len(keys)
 	key_start_mark := key_token.start_mark
-	key_end_mark := key_start_mark
 	for i := 0; i < key_len; i++ {
-		if len(keys[0]) == 0 {
+		if len(keys[i]) == 0 {
 			return ini_parser_set_scanner_error(parser,
 				"while scanning for the key", parser.mark,
 				"empty map key")
 		}
 		// key
-		key_start_mark = key_end_mark
-		if explicit {
-			key_end_mark.index = key_start_mark.index + 1
-		}
 		key_token := ini_token_t{
 			typ:        ini_KEY_TOKEN,
 			start_mark: key_start_mark,
-			end_mark:   key_end_mark,
+			end_mark:   key_start_mark,
 		}
 		ini_insert_token(parser, -1, &key_token)
-		// scalar
-		key_start_mark = key_end_mark
-		key_end_mark.index = key_start_mark.index + len(keys[0])
-		scalar_token := ini_token_t{
-			typ:        ini_SCALAR_TOKEN,
-			start_mark: key_start_mark,
-			end_mark:   key_end_mark,
-			value:      keys[0],
-			style:      ini_PLAIN_SCALAR_STYLE,
-		}
-		ini_insert_token(parser, -1, &scalar_token)
-		// prepare for next
-		keys = keys[1:]
-	}
+        key_end_mark := key_start_mark
+        key_end_mark.index = key_start_mark.index + len(keys[i])
+        scalar_token := ini_token_t{
+            typ:        ini_SCALAR_TOKEN,
+            start_mark: key_start_mark,
+            end_mark:   key_end_mark,
+            value:      keys[i],
+            style:      ini_PLAIN_SCALAR_STYLE,
+        }
+        ini_insert_token(parser, -1, &scalar_token)
+        if i < key_len-1 {
+            // map
+            key_start_mark = key_end_mark
+            key_end_mark.index = key_start_mark.index + 1
+            map_token := ini_token_t{
+                typ:        ini_MAP_TOKEN,
+                start_mark: key_start_mark,
+                end_mark:   key_end_mark,
+                value:      []byte("."),
+                style:      ini_PLAIN_SCALAR_STYLE,
+            }
+            ini_insert_token(parser, -1, &map_token)
+        }
+    }
 	return true
 }
 
