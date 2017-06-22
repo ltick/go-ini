@@ -14,6 +14,7 @@ import (
 const (
 	documentNode = 1 << iota
 	sectionNode
+	inheritSectionNode
 	keyNode
 	valueNode
 	scalarNode
@@ -101,6 +102,8 @@ func (p *parser) parse() *node {
 		return p.document()
 	case ini_SECTION_START_EVENT:
 		return p.section()
+	case ini_SECTION_INHERIT_EVENT:
+		return p.section_inherit()
 	case ini_KEY_EVENT:
 		return p.key()
 	case ini_VALUE_EVENT:
@@ -141,27 +144,24 @@ func (p *parser) document() *node {
 func (p *parser) section() *node {
 	thisNode := p.node(sectionNode)
 	thisNode.value = string(p.event.value)
-	// inherit
-	if strings.Contains(thisNode.value, ":") {
-		section_items := strings.SplitN(thisNode.value, ":", 2)
-		l := len(p.doc.children)
-		for j := 0; j < l; j += 1 {
-			if p.doc.children[j].value == section_items[1] {
-				for _, child := range p.doc.children[j].children {
-					thisNode.children = append(thisNode.children, child)
-				}
-			}
-		}
-	}
+
 	// until next ini_SECTION_START_EVENT
 	p.skip()
 	var parentNode *node
 	currentNode := thisNode
 	for p.event.typ != ini_SECTION_START_EVENT {
 		nextNode := p.parse()
-        fmt.Println("xxxxx")
-        fmt.Println(nextNode.kind)
-		if nextNode.kind == keyNode {
+		if nextNode.kind == inheritSectionNode {
+			// inherit
+			l := len(p.doc.children)
+			for j := 0; j < l; j += 1 {
+				if p.doc.children[j].value == nextNode.value {
+					for _, childNode := range p.doc.children[j].children {
+                        currentNode.children = append(currentNode.children, childNode)
+					}
+				}
+			}
+		} else if nextNode.kind == keyNode {
 			parentNode = currentNode
 			keyExist := false
 			i := 0
@@ -176,14 +176,18 @@ func (p *parser) section() *node {
 				currentNode.children = append(currentNode.children, nextNode)
 				currentNode = nextNode
 			}
-            fmt.Println(currentNode.value)
 		} else if nextNode.kind == valueNode {
 			parentNode.children = append(parentNode.children, nextNode)
+			currentNode = thisNode
 		}
 	}
-	fmt.Println("adas")
+	return thisNode
+}
 
-	fmt.Println(thisNode.children)
+func (p *parser) section_inherit() *node {
+	thisNode := p.node(inheritSectionNode)
+	thisNode.value = string(p.event.value)
+	p.skip()
 	return thisNode
 }
 
@@ -462,12 +466,10 @@ func (d *decoder) section(n *node, out reflect.Value) (good bool) {
 }
 
 func (d *decoder) key(n *node, out reflect.Value) (good bool) {
-	fmt.Println("key")
 	return d.scalar(n, out)
 }
 
 func (d *decoder) value(n *node, out reflect.Value) (good bool) {
-	fmt.Println("value")
 	return d.scalar(n, out)
 }
 

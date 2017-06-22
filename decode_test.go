@@ -279,9 +279,12 @@ var unmarshalTests = []struct {
         map[string]map[string]string{"section": map[string]string{"hello": "world"}},
     }, {
         "hello1= world[section:default]\nhello= world",
+        map[string]map[string]interface{}{"default": map[string]interface{}{"hello1": "world[section:default]", "hello": "world"}},
+    }, {
+        "hello1= world\n[section:default]\nhello= world",
         map[string]map[string]interface{}{"default": map[string]interface{}{"hello1": "world"}, "section": map[string]interface{}{"hello1": "world", "hello": "world"}},
     }, {
-        "[default]hello1= world[section:default]\nhello= world",
+        "[default]hello1= world\n[section:default]\nhello= world",
         map[string]map[string]interface{}{"default": map[string]interface{}{"hello1": "world"}, "section": map[string]interface{}{"hello1": "world", "hello": "world"}},
     }, {
         "[default]hello.1= world",

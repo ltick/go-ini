@@ -316,10 +316,10 @@ func ini_emitter_select_scalar_style(emitter *ini_emitter_t, event *ini_event_t)
 
 	style := event.scalar_style()
 	if style == ini_ANY_SCALAR_STYLE {
-		style = ini_LITERAL_SCALAR_STYLE
+		style = ini_PLAIN_SCALAR_STYLE
 	}
 
-	if style == ini_LITERAL_SCALAR_STYLE {
+	if style == ini_PLAIN_SCALAR_STYLE {
 		if len(emitter.scalar_data.value) == 0 {
 			style = ini_SINGLE_QUOTED_SCALAR_STYLE
 		}

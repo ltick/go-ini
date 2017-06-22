@@ -141,9 +141,9 @@ func (e *encoder) stringv(in reflect.Value) {
 	if isBase60Float(s) {
 		style = ini_DOUBLE_QUOTED_SCALAR_STYLE
 	} else if strings.Contains(s, "\n") {
-		style = ini_LITERAL_SCALAR_STYLE
+		style = ini_PLAIN_SCALAR_STYLE
 	} else {
-		style = ini_LITERAL_SCALAR_STYLE
+		style = ini_PLAIN_SCALAR_STYLE
 	}
 	e.emitNode(s, style)
 }
@@ -155,17 +155,17 @@ func (e *encoder) boolv(in reflect.Value) {
 	} else {
 		s = "false"
 	}
-	e.emitNode(s, ini_LITERAL_SCALAR_STYLE)
+	e.emitNode(s, ini_PLAIN_SCALAR_STYLE)
 }
 
 func (e *encoder) intv(in reflect.Value) {
 	s := strconv.FormatInt(in.Int(), 10)
-	e.emitNode(s, ini_LITERAL_SCALAR_STYLE)
+	e.emitNode(s, ini_PLAIN_SCALAR_STYLE)
 }
 
 func (e *encoder) uintv(in reflect.Value) {
 	s := strconv.FormatUint(in.Uint(), 10)
-	e.emitNode(s, ini_LITERAL_SCALAR_STYLE)
+	e.emitNode(s, ini_PLAIN_SCALAR_STYLE)
 }
 
 func (e *encoder) floatv(in reflect.Value) {
@@ -179,11 +179,11 @@ func (e *encoder) floatv(in reflect.Value) {
 	case "NaN":
 		s = ".nan"
 	}
-	e.emitNode(s, ini_LITERAL_SCALAR_STYLE)
+	e.emitNode(s, ini_PLAIN_SCALAR_STYLE)
 }
 
 func (e *encoder) nilv() {
-	e.emitNode("null", ini_LITERAL_SCALAR_STYLE)
+	e.emitNode("null", ini_PLAIN_SCALAR_STYLE)
 }
 
 func (e *encoder) emitNode(value string, style ini_scalar_style_t) {

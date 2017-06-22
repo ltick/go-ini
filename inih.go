@@ -53,7 +53,6 @@ const (
 	ini_ANY_SCALAR_STYLE ini_scalar_style_t = iota
 
 	ini_PLAIN_SCALAR_STYLE         // The plain scalar style.
-	ini_LITERAL_SCALAR_STYLE       // The literal scalar style.
 	ini_SINGLE_QUOTED_SCALAR_STYLE // The single-quoted scalar style.
 	ini_DOUBLE_QUOTED_SCALAR_STYLE // The double-quoted scalar style.
 )
@@ -73,7 +72,7 @@ const (
 	ini_SECTION_START_TOKEN   // A SECTION-START token.
 	ini_SECTION_INHERIT_TOKEN // A SECTION-INHERIT token.
     ini_SECTION_ENTRY_TOKEN // A SECTION-ENTRY token.
-    
+
 	ini_KEY_TOKEN // An VALUE token.
 	ini_VALUE_TOKEN // An VALUE token.
 	ini_SCALAR_TOKEN        // A SCALAR token.
@@ -94,6 +93,8 @@ func (tt ini_token_type_t) String() string {
 		return "ini_SECTION_START_TOKEN"
 	case ini_SECTION_INHERIT_TOKEN:
 		return "ini_SECTION_INHERIT_TOKEN"
+    case ini_SECTION_ENTRY_TOKEN:
+        return "ini_SECTION_ENTRY_TOKEN"
 	case ini_KEY_TOKEN:
 		return "ini_KEY_TOKEN"
 	case ini_VALUE_TOKEN:
@@ -119,7 +120,7 @@ type ini_token_t struct {
 	// The scalar value
 	// (for ini_SCALAR_TOKEN).
 	value []byte
-	
+
 	// The scalar style (for ini_SCALAR_TOKEN).
 	style ini_scalar_style_t
 }
@@ -136,8 +137,9 @@ const (
 	ini_DOCUMENT_START_EVENT  // A DOCUMENT-START event.
 	ini_DOCUMENT_END_EVENT    // A DOCUMENT-END event.
 	ini_SECTION_START_EVENT   // A SECTION-START event.
-    ini_SECTION_END_EVENT   // A SECTION-END event.
-    
+	ini_SECTION_INHERIT_EVENT // A SECTION-INHERIT event.
+    ini_SECTION_ENTRY_EVENT   // A SECTION-ENTRY event.
+
     ini_KEY_EVENT  // An KEY event.
     ini_VALUE_EVENT  // An VALUE event.
     ini_SCALAR_EVENT  // An SCALAR event.
@@ -155,7 +157,7 @@ type ini_event_t struct {
 
 	// The node value.
 	value []byte
-    
+
     // The tag (for ini_SCALAR_EVENT).
     tag []byte
 
@@ -173,8 +175,10 @@ func (e *ini_event_t) event_type() string {
 		return "ini_DOCUMENT_END_EVENT"
 	case ini_SECTION_START_EVENT:
 		return "ini_SECTION_START_EVENT"
-    case ini_SECTION_END_EVENT:
-        return "ini_SECTION_END_EVENT"
+	case ini_SECTION_INHERIT_EVENT:
+		return "ini_SECTION_INHERIT_EVENT"
+    case ini_SECTION_ENTRY_EVENT:
+        return "ini_SECTION_ENTRY_EVENT"
     case ini_KEY_EVENT:
         return "ini_KEY_EVENT"
     case ini_VALUE_EVENT:
@@ -199,10 +203,10 @@ const (
 	ini_FLOAT_TAG  = "float" // The tag 'float' for float values.
 	ini_BINARY_TAG = "binary"
     ini_MAP_TAG = "map"
-    
+
     ini_SECTION_TAG = "section"
 	ini_SECTION_INHERIT_TAG = "section_inherit"
-    
+
     ini_DEFAULT_SCALAR_TAG   = ini_STR_TAG // The default scalar tag is str
 )
 
@@ -271,7 +275,9 @@ const (
 	ini_PARSE_DOCUMENT_START_STATE ini_parser_state_t = iota // Expect START.
 
 	ini_PARSE_DOCUMENT_END_STATE        // Expect DOCUMENT-START.
-	ini_PARSE_SECTION_FIRST_ENTRY_STATE // Expect SECTION-FIRST-ENTRY.
+	ini_PARSE_SECTION_FIRST_START_STATE // Expect SECTION-FIRST-ENTRY.
+	ini_PARSE_SECTION_START_STATE       // Expect SECTION-ENTRY.
+	ini_PARSE_SECTION_INHERIT_STATE 	// Expect SECTION-INHERIT.
 	ini_PARSE_SECTION_ENTRY_STATE       // Expect SECTION-ENTRY.
     ini_PARSE_SECTION_NODE_STATE   // Expect a MAP.
 	ini_PARSE_COMMENT_START_STATE       // Expect COMMENT-START.
@@ -285,8 +291,12 @@ func (ps ini_parser_state_t) String() string {
 		return "ini_PARSE_DOCUMENT_START_STATE"
 	case ini_PARSE_DOCUMENT_END_STATE:
 		return "ini_PARSE_DOCUMENT_END_STATE"
-	case ini_PARSE_SECTION_FIRST_ENTRY_STATE:
-		return "ini_PARSE_SECTION_FIRST_ENTRY_STATE"
+	case ini_PARSE_SECTION_FIRST_START_STATE:
+		return "ini_PARSE_SECTION_FIRST_START_STATE"
+	case ini_PARSE_SECTION_START_STATE:
+		return "ini_PARSE_SECTION_START_STATE"
+	case ini_PARSE_SECTION_INHERIT_STATE:
+		return "ini_PARSE_SECTION_INHERIT_STATE"
 	case ini_PARSE_SECTION_ENTRY_STATE:
 		return "ini_PARSE_SECTION_ENTRY_STATE"
 	case ini_PARSE_SECTION_NODE_STATE:

@@ -60,10 +60,12 @@ func ini_parser_state_machine(parser *ini_parser_t, event *ini_event_t) bool {
 	switch parser.state {
 	case ini_PARSE_DOCUMENT_START_STATE:
 		return ini_parser_parse_document_start(parser, event)
-	case ini_PARSE_SECTION_FIRST_ENTRY_STATE:
-		return ini_parser_parse_section_entry(parser, event, true)
-	case ini_PARSE_SECTION_ENTRY_STATE:
-		return ini_parser_parse_section_entry(parser, event, false)
+	case ini_PARSE_SECTION_FIRST_START_STATE:
+		return ini_parser_parse_section_start(parser, event, true)
+	case ini_PARSE_SECTION_START_STATE:
+		return ini_parser_parse_section_start(parser, event, false)
+	case ini_PARSE_SECTION_INHERIT_STATE:
+		return ini_parser_parse_section_inherit(parser, event)
 	case ini_PARSE_SECTION_NODE_STATE:
 		return ini_parser_parse_section_node(parser, event)
 	default:
@@ -82,7 +84,7 @@ func ini_parser_parse_document_start(parser *ini_parser_t, event *ini_event_t) b
 		return ini_parser_set_parser_error(parser, "did not find expected <document-start>", token.start_mark)
 	}
 	parser.states = append(parser.states, ini_PARSE_DOCUMENT_END_STATE)
-	parser.state = ini_PARSE_SECTION_FIRST_ENTRY_STATE
+	parser.state = ini_PARSE_SECTION_FIRST_START_STATE
 	*event = ini_event_t{
 		typ:        ini_DOCUMENT_START_EVENT,
 		start_mark: token.start_mark,
@@ -92,8 +94,8 @@ func ini_parser_parse_document_start(parser *ini_parser_t, event *ini_event_t) b
 }
 
 // Parse the section:
-func ini_parser_parse_section_entry(parser *ini_parser_t, event *ini_event_t, first bool) bool {
-	//defer trace("ini_parser_parse_section_entry")
+func ini_parser_parse_section_start(parser *ini_parser_t, event *ini_event_t, first bool) bool {
+	//defer trace("ini_parser_parse_section_start")
 
 	token := peek_token(parser)
 	if token == nil {
@@ -107,7 +109,6 @@ func ini_parser_parse_section_entry(parser *ini_parser_t, event *ini_event_t, fi
 			start_mark: token.start_mark,
 			end_mark:   token.end_mark,
 		}
-		return true
 	} else {
 		if first && token.typ == ini_KEY_TOKEN {
 			parser.state = ini_PARSE_SECTION_NODE_STATE
@@ -128,64 +129,21 @@ func ini_parser_parse_section_entry(parser *ini_parser_t, event *ini_event_t, fi
 			}
 			skip_token(parser)
 			if token.typ == ini_SCALAR_TOKEN {
-				section_name := token.value[0:]
-				inherit := false
+				section_key := token.value
 				token := peek_token(parser)
 				if token == nil {
 					return false
 				}
 				end_mark := token.end_mark
 				// SECTION-INHERIT Token (:)
-				if token.typ == ini_SECTION_INHERIT_TOKEN {
-					inherit = true
-					skip_token(parser)
-					for _, v := range token.value {
-						section_name = append(section_name, v)
-					}
-					token = peek_token(parser)
-					if token == nil {
-						return false
-					}
-					skip_token(parser)
-					for _, v := range token.value {
-						section_name = append(section_name, v)
-					}
-					end_mark = token.end_mark
-					if token.typ == ini_SCALAR_TOKEN {
-						parser.state = ini_PARSE_SECTION_NODE_STATE
-					} else {
-						return ini_parser_set_parser_error(parser, "did not find expected <scalar>", token.start_mark)
-					}
-					token = peek_token(parser)
-					if token == nil {
-						return false
-					}
-				}
-				if token.typ == ini_SECTION_ENTRY_TOKEN {
-					skip_token(parser)
-					parser.state = ini_PARSE_SECTION_NODE_STATE
-					if inherit {
-						*event = ini_event_t{
-							typ:        ini_SECTION_START_EVENT,
-							start_mark: start_mark,
-							end_mark:   end_mark,
-							value:      section_name,
-							tag:        []byte(ini_SECTION_INHERIT_TAG),
-							style:      ini_style_t(token.style),
-						}
-					} else {
-						*event = ini_event_t{
-							typ:        ini_SECTION_START_EVENT,
-							start_mark: start_mark,
-							end_mark:   end_mark,
-							value:      section_name,
-							tag:        []byte(ini_SECTION_TAG),
-							style:      ini_style_t(token.style),
-						}
-					}
-					return true
-				} else {
-					return ini_parser_set_parser_error(parser, "did not find expected <section-end>", token.start_mark)
+				parser.state = ini_PARSE_SECTION_INHERIT_STATE
+				*event = ini_event_t{
+					typ:        ini_SECTION_START_EVENT,
+					start_mark: start_mark,
+					end_mark:   end_mark,
+					value:      section_key,
+					tag:        []byte(ini_SECTION_TAG),
+					style:      ini_style_t(token.style),
 				}
 			} else {
 				return ini_parser_set_parser_error(parser, "did not find expected <scalar>", token.start_mark)
@@ -194,6 +152,53 @@ func ini_parser_parse_section_entry(parser *ini_parser_t, event *ini_event_t, fi
 			return ini_parser_set_parser_error(parser, "did not find expected <section-start> or <map>", token.start_mark)
 		}
 	}
+	return true
+}
+
+// Parse the section:
+func ini_parser_parse_section_inherit(parser *ini_parser_t, event *ini_event_t) bool {
+	//defer trace("ini_parser_parse_section_inherit")
+	// SECTION-INHERIT Token (:)
+	token := peek_token(parser)
+	if token == nil {
+		return false
+	}
+	start_mark := token.start_mark
+	end_mark := token.start_mark
+	section_key := []byte("")
+	if token.typ == ini_SECTION_INHERIT_TOKEN {
+		skip_token(parser)
+		token = peek_token(parser)
+		if token == nil {
+			return false
+		}
+		if token.typ == ini_SCALAR_TOKEN {
+			start_mark = token.start_mark
+			end_mark = token.end_mark
+			section_key = token.value
+			skip_token(parser)
+		} else {
+			return ini_parser_set_parser_error(parser, "did not find expected <scalar>", token.start_mark)
+		}
+		token = peek_token(parser)
+		if token == nil {
+			return false
+		}
+		if token.typ == ini_SECTION_ENTRY_TOKEN {
+			skip_token(parser)
+		}
+	} else if token.typ == ini_SECTION_ENTRY_TOKEN {
+		skip_token(parser)
+	}
+	parser.state = ini_PARSE_SECTION_NODE_STATE
+	*event = ini_event_t{
+		typ:        ini_SECTION_INHERIT_EVENT,
+		start_mark: start_mark,
+		end_mark:   end_mark,
+		value:      section_key,
+		tag:        []byte(ini_SECTION_INHERIT_TAG),
+	}
+	return true
 }
 
 // Parse the productions:
@@ -244,7 +249,7 @@ func ini_parser_parse_section_node(parser *ini_parser_t, event *ini_event_t) boo
 		}
 		return true
 	} else {
-		parser.state = ini_PARSE_SECTION_ENTRY_STATE
+		parser.state = ini_PARSE_SECTION_START_STATE
 		*event = ini_event_t{
 			typ:        ini_SECTION_START_EVENT,
 			start_mark: token.start_mark,
