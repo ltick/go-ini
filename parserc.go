@@ -211,43 +211,48 @@ func ini_parser_parse_section_node(parser *ini_parser_t, event *ini_event_t) boo
 	}
 	if token.typ == ini_VALUE_TOKEN {
 		skip_token(parser)
-		parser.state = ini_PARSE_SECTION_NODE_STATE
-		tag := analyzeTag(string(token.value))
-		*event = ini_event_t{
-			typ:        ini_VALUE_EVENT,
-			start_mark: token.start_mark,
-			end_mark:   token.end_mark,
-			value:      token.value,
-			tag:        []byte(tag),
-			style:      ini_style_t(token.style),
+		token := peek_token(parser)
+		if token == nil {
+			return false
 		}
-		return true
+		if token.typ == ini_SCALAR_TOKEN {
+			skip_token(parser)
+			parser.state = ini_PARSE_SECTION_NODE_STATE
+			tag := analyzeTag(string(token.value))
+			*event = ini_event_t{
+				typ:        ini_SCALAR_EVENT,
+				start_mark: token.start_mark,
+				end_mark:   token.end_mark,
+				value:      token.value,
+				tag:        []byte(tag),
+				style:      ini_style_t(token.style),
+			}
+			return true
+		} else {
+			return ini_parser_set_parser_error(parser, "did not find expected <scalar>", token.start_mark)
+		}
 	} else if token.typ == ini_KEY_TOKEN {
 		skip_token(parser)
-		parser.state = ini_PARSE_SECTION_NODE_STATE
-		tag := analyzeTag(string(token.value))
-		*event = ini_event_t{
-			typ:        ini_KEY_EVENT,
-			start_mark: token.start_mark,
-			end_mark:   token.end_mark,
-			value:      token.value,
-			tag:        []byte(tag),
-			style:      ini_style_t(token.style),
+		token := peek_token(parser)
+		if token == nil {
+			return false
 		}
-		return true
-	} else if token.typ == ini_SCALAR_TOKEN {
-		skip_token(parser)
-		parser.state = ini_PARSE_SECTION_NODE_STATE
-		tag := analyzeTag(string(token.value))
-		*event = ini_event_t{
-			typ:        ini_SCALAR_EVENT,
-			start_mark: token.start_mark,
-			end_mark:   token.end_mark,
-			value:      token.value,
-			tag:        []byte(tag),
-			style:      ini_style_t(token.style),
+		if token.typ == ini_SCALAR_TOKEN {
+			skip_token(parser)
+			parser.state = ini_PARSE_SECTION_NODE_STATE
+			tag := analyzeTag(string(token.value))
+			*event = ini_event_t{
+				typ:        ini_SCALAR_EVENT,
+				start_mark: token.start_mark,
+				end_mark:   token.end_mark,
+				value:      token.value,
+				tag:        []byte(tag),
+				style:      ini_style_t(token.style),
+			}
+			return true
+		} else {
+			return ini_parser_set_parser_error(parser, "did not find expected <scalar>", token.start_mark)
 		}
-		return true
 	} else {
 		parser.state = ini_PARSE_SECTION_START_STATE
 		*event = ini_event_t{

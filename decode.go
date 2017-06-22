@@ -14,9 +14,8 @@ import (
 const (
 	documentNode = 1 << iota
 	sectionNode
-	inheritSectionNode
-	keyNode
-	valueNode
+	inheritNode
+	mappingNode
 	scalarNode
 	commentNode
 )
@@ -97,17 +96,16 @@ func (p *parser) fail() {
 }
 
 func (p *parser) parse() *node {
+    fmt.Println(p.event.typ )
 	switch p.event.typ {
 	case ini_DOCUMENT_START_EVENT:
 		return p.document()
 	case ini_SECTION_START_EVENT:
 		return p.section()
 	case ini_SECTION_INHERIT_EVENT:
-		return p.section_inherit()
-	case ini_KEY_EVENT:
-		return p.key()
-	case ini_VALUE_EVENT:
-		return p.value()
+		return p.inherit()
+	case ini_MAPPING_EVENT:
+		return p.mapping()
 	case ini_SCALAR_EVENT:
 		return p.scalar()
 	case ini_COMMENT_EVENT:
@@ -147,22 +145,21 @@ func (p *parser) section() *node {
 
 	// until next ini_SECTION_START_EVENT
 	p.skip()
-	var parentNode *node
 	currentNode := thisNode
 	for p.event.typ != ini_SECTION_START_EVENT {
 		nextNode := p.parse()
-		if nextNode.kind == inheritSectionNode {
+		if nextNode.kind == inheritNode {
 			// inherit
 			l := len(p.doc.children)
 			for j := 0; j < l; j += 1 {
 				if p.doc.children[j].value == nextNode.value {
 					for _, childNode := range p.doc.children[j].children {
-                        currentNode.children = append(currentNode.children, childNode)
+						currentNode.children = append(currentNode.children, childNode)
 					}
 				}
 			}
-		} else if nextNode.kind == keyNode {
-			parentNode = currentNode
+		} else if nextNode.kind == mappingNode {
+            fmt.Println("mappingNode")
 			keyExist := false
 			i := 0
 			for ; i < len(currentNode.children); i++ {
@@ -176,16 +173,16 @@ func (p *parser) section() *node {
 				currentNode.children = append(currentNode.children, nextNode)
 				currentNode = nextNode
 			}
-		} else if nextNode.kind == valueNode {
-			parentNode.children = append(parentNode.children, nextNode)
+		} else if nextNode.kind == scalarNode {
+			currentNode.children = append(currentNode.children, nextNode)
 			currentNode = thisNode
 		}
 	}
 	return thisNode
 }
 
-func (p *parser) section_inherit() *node {
-	thisNode := p.node(inheritSectionNode)
+func (p *parser) inherit() *node {
+	thisNode := p.node(inheritNode)
 	thisNode.value = string(p.event.value)
 	p.skip()
 	return thisNode
@@ -198,17 +195,10 @@ func (p *parser) comment() *node {
 	return thisNode
 }
 
-func (p *parser) key() *node {
+func (p *parser) mapping() *node {
+	thisNode := p.node(mappingNode)
+	thisNode.value = string(p.event.value)
 	p.skip()
-	thisNode := p.parse()
-	thisNode.kind = keyNode
-	return thisNode
-}
-
-func (p *parser) value() *node {
-	p.skip()
-	thisNode := p.parse()
-	thisNode.kind = valueNode
 	return thisNode
 }
 
@@ -319,10 +309,8 @@ func (d *decoder) unmarshal(n *node, out reflect.Value) (good bool) {
 	switch n.kind {
 	case sectionNode:
 		good = d.section(n, out)
-	case keyNode:
-		good = d.key(n, out)
-	case valueNode:
-		good = d.value(n, out)
+	case mappingNode:
+		good = d.mapping(n, out)
 	case scalarNode:
 		good = d.scalar(n, out)
 	default:
@@ -442,7 +430,7 @@ func (d *decoder) section(n *node, out reflect.Value) (good bool) {
 		out.Set(reflect.MakeMap(outt))
 	}
 	l := len(n.children)
-	for i := 0; i < l; i++ {
+	for i := 0; i < l; i += 2 {
 		k := reflect.New(kt).Elem()
 		if d.unmarshal(n.children[i], k) {
 			kkind := k.Kind()
@@ -452,25 +440,14 @@ func (d *decoder) section(n *node, out reflect.Value) (good bool) {
 			if kkind == reflect.Map || kkind == reflect.Slice {
 				failf("invalid map key: %#v", k.Interface())
 			}
-			i++
-			if n.children[i].kind == valueNode {
-				e := reflect.New(et).Elem()
-				if d.unmarshal(n.children[i], e) {
-					out.SetMapIndex(k, e)
-				}
+			e := reflect.New(et).Elem()
+			if d.unmarshal(n.children[i+1], e) {
+				out.SetMapIndex(k, e)
 			}
 		}
 	}
 	d.mapType = mapType
 	return true
-}
-
-func (d *decoder) key(n *node, out reflect.Value) (good bool) {
-	return d.scalar(n, out)
-}
-
-func (d *decoder) value(n *node, out reflect.Value) (good bool) {
-	return d.scalar(n, out)
 }
 
 func (d *decoder) scalar(n *node, out reflect.Value) (good bool) {

@@ -428,16 +428,16 @@ func ini_parser_fetch_next_token(parser *ini_parser_t) bool {
 }
 
 // Increase the flow level and resize the simple key list if needed.
-func ini_parser_increase_level(parser *ini_parser_t) bool {
+func ini_parser_increase_key_level(parser *ini_parser_t) bool {
 	// Increase the flow level.
-	parser.level++
+	parser.key_level++
 	return true
 }
 
 // Decrease the flow level.
-func ini_parser_decrease_level(parser *ini_parser_t) bool {
-	if parser.level > 0 {
-		parser.level--
+func ini_parser_decrease_key_level(parser *ini_parser_t) bool {
+	if parser.key_level > 0 {
+		parser.key_level--
 	}
 	return true
 }

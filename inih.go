@@ -140,8 +140,7 @@ const (
 	ini_SECTION_INHERIT_EVENT // A SECTION-INHERIT event.
     ini_SECTION_ENTRY_EVENT   // A SECTION-ENTRY event.
 
-    ini_KEY_EVENT  // An KEY event.
-    ini_VALUE_EVENT  // An VALUE event.
+    ini_MAPPING_EVENT  // An MAPPING event.
     ini_SCALAR_EVENT  // An SCALAR event.
 	ini_COMMENT_EVENT // A COMMENT event.
 )
@@ -179,10 +178,8 @@ func (e *ini_event_t) event_type() string {
 		return "ini_SECTION_INHERIT_EVENT"
     case ini_SECTION_ENTRY_EVENT:
         return "ini_SECTION_ENTRY_EVENT"
-    case ini_KEY_EVENT:
-        return "ini_KEY_EVENT"
-    case ini_VALUE_EVENT:
-        return "ini_VALUE_EVENT"
+    case ini_MAPPING_EVENT:
+        return "ini_MAPPING_EVENT"
 	case ini_SCALAR_EVENT:
 		return "ini_SCALAR_EVENT"
 	case ini_COMMENT_EVENT:
@@ -351,7 +348,7 @@ type ini_parser_t struct {
 	offset int        // The offset of the current position (in bytes).
 	mark   ini_mark_t // The mark of the current position.
 
-	level int // The current flow level.
+    key_level int // The current key level.
 
 	// Scanner stuff
 	document_start_produced bool // Have we started to scan the input stream?
