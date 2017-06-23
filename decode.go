@@ -144,40 +144,38 @@ func (p *parser) section() *node {
 
 	// until next ini_SECTION_START_EVENT
 	p.skip()
-	currentNode := thisNode
-    parentNode := currentNode
+	parentNode := thisNode
 	for p.event.typ != ini_SECTION_START_EVENT {
-		nextNode := p.parse()
-		if nextNode.kind == inheritNode {
+		currentNode := p.parse()
+		if currentNode.kind == inheritNode {
 			// inherit
-			l := len(p.doc.children)
-			for j := 0; j < l; j += 1 {
-				if p.doc.children[j].value == nextNode.value {
-					for _, childNode := range p.doc.children[j].children {
-						currentNode.children = append(currentNode.children, childNode)
+			for i := 0; i < len(p.doc.children); i++ {
+				if p.doc.children[i].value == currentNode.value {
+					for _, childNode := range p.doc.children[i].children {
+                        thisNode.children = append(thisNode.children, childNode)
 					}
+					break
 				}
 			}
-		} else if nextNode.kind == scalarNode {
-			if currentNode.kind == mappingNode {
-				for i := 0; i < len(currentNode.children); i++ {
-					if nextNode.kind == currentNode.children[i].kind && nextNode.value == currentNode.children[i].value {
-						currentNode = currentNode.children[i]
-						break
-					}
+		} else if currentNode.kind == scalarNode {
+			nodeExist := false
+			i := 0
+			for ; i < len(parentNode.children); i += 2 {
+				if currentNode.kind == parentNode.children[i].kind && currentNode.value == parentNode.children[i].value {
+					nodeExist = true
+					break
 				}
-				currentNode.children = append(currentNode.children, nextNode)
+			}
+			if nodeExist {
+				parentNode = parentNode.children[i+1]
 			} else {
-				parentNode.children = append(parentNode.children, nextNode)
-				if currentNode.kind == scalarNode {
-					currentNode = thisNode
+				nextNode := p.parse()
+				parentNode.children = append(parentNode.children, currentNode, nextNode)
+				if nextNode.kind == mappingNode {
+					parentNode = nextNode
 				}
 			}
-		} else if nextNode.kind == mappingNode {
-            parentNode.children = append(parentNode.children, nextNode)
-            parentNode = nextNode
 		}
-        currentNode = nextNode
 	}
 	return thisNode
 }
@@ -431,7 +429,10 @@ func (d *decoder) section(n *node, out reflect.Value) (good bool) {
 		out.Set(reflect.MakeMap(outt))
 	}
 	l := len(n.children)
+	fmt.Println("===")
 	for i := 0; i < l; i += 2 {
+		fmt.Println(n.children[i].value)
+		fmt.Println(n.children[i+1].value)
 		k := reflect.New(kt).Elem()
 		if d.unmarshal(n.children[i], k) {
 			kkind := k.Kind()
@@ -447,6 +448,7 @@ func (d *decoder) section(n *node, out reflect.Value) (good bool) {
 			}
 		}
 	}
+	fmt.Println("---")
 	d.mapType = mapType
 	return true
 }
