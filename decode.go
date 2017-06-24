@@ -7,7 +7,6 @@ import (
 	"math"
 	"reflect"
 	"strconv"
-	"strings"
 	"time"
 )
 
@@ -125,6 +124,16 @@ func (p *parser) node(kind int) *node {
 	}
 }
 
+func (p *parser) clone_node(n *node) *node {
+	thisNode := p.node(n.kind)
+	thisNode.tag = n.tag
+	thisNode.value = n.value
+	for _, childNode := range n.children {
+		thisNode.children = append(thisNode.children, p.clone_node(childNode))
+	}
+	return thisNode
+}
+
 func (p *parser) document() *node {
 	n := p.node(documentNode)
 	p.doc = n
@@ -152,16 +161,22 @@ func (p *parser) section() *node {
 			for i := 0; i < len(p.doc.children); i++ {
 				if p.doc.children[i].value == currentNode.value {
 					for _, childNode := range p.doc.children[i].children {
-                        thisNode.children = append(thisNode.children, childNode)
+						thisNode.children = append(thisNode.children, p.clone_node(childNode))
 					}
 					break
 				}
 			}
 		} else if currentNode.kind == scalarNode {
+			nextNode := p.parse()
 			nodeExist := false
 			i := 0
 			for ; i < len(parentNode.children); i += 2 {
-				if currentNode.kind == parentNode.children[i].kind && currentNode.value == parentNode.children[i].value {
+				// condition:
+				// 1. current node type
+				// 1. current node value
+				// 2. next node type
+				if currentNode.kind == parentNode.children[i].kind && currentNode.value == parentNode.children[i].value &&
+					parentNode.children[i+1].kind == nextNode.kind {
 					nodeExist = true
 					break
 				}
@@ -169,7 +184,6 @@ func (p *parser) section() *node {
 			if nodeExist {
 				parentNode = parentNode.children[i+1]
 			} else {
-				nextNode := p.parse()
 				parentNode.children = append(parentNode.children, currentNode, nextNode)
 				if nextNode.kind == mappingNode {
 					parentNode = nextNode
@@ -356,12 +370,6 @@ func (d *decoder) document(n *node, out reflect.Value) (good bool) {
 		for i := 0; i < l; i += 1 {
 			k := reflect.New(kt).Elem()
 			e := reflect.New(et).Elem()
-			section_key := n.children[i].value
-			//inherit
-			if strings.Contains(n.children[i].value, ":") {
-				section_items := strings.SplitN(n.children[i].value, ":", 2)
-				section_key = section_items[0]
-			}
 			if d.unmarshal(n.children[i], e) {
 				kkind := k.Kind()
 				if kkind == reflect.Interface {
@@ -370,7 +378,7 @@ func (d *decoder) document(n *node, out reflect.Value) (good bool) {
 				if kkind == reflect.Map || kkind == reflect.Slice {
 					failf("invalid section key: %#v", k.Interface())
 				}
-				k.SetString(section_key)
+				k.SetString(n.children[i].value)
 				out.SetMapIndex(k, e)
 			}
 
@@ -429,10 +437,7 @@ func (d *decoder) section(n *node, out reflect.Value) (good bool) {
 		out.Set(reflect.MakeMap(outt))
 	}
 	l := len(n.children)
-	fmt.Println("===")
 	for i := 0; i < l; i += 2 {
-		fmt.Println(n.children[i].value)
-		fmt.Println(n.children[i+1].value)
 		k := reflect.New(kt).Elem()
 		if d.unmarshal(n.children[i], k) {
 			kkind := k.Kind()
@@ -448,7 +453,6 @@ func (d *decoder) section(n *node, out reflect.Value) (good bool) {
 			}
 		}
 	}
-	fmt.Println("---")
 	d.mapType = mapType
 	return true
 }
