@@ -137,7 +137,6 @@ const (
 
 	ini_DOCUMENT_START_EVENT  // A DOCUMENT-START event.
 	ini_DOCUMENT_END_EVENT    // A DOCUMENT-END event.
-	ini_SECTION_START_EVENT   // A SECTION-START event.
 	ini_SECTION_INHERIT_EVENT // A SECTION-INHERIT event.
     ini_SECTION_ENTRY_EVENT   // A SECTION-ENTRY event.
 
@@ -173,8 +172,6 @@ func (e *ini_event_t) event_type() string {
 		return "ini_DOCUMENT_START_EVENT"
 	case ini_DOCUMENT_END_EVENT:
 		return "ini_DOCUMENT_END_EVENT"
-	case ini_SECTION_START_EVENT:
-		return "ini_SECTION_START_EVENT"
 	case ini_SECTION_INHERIT_EVENT:
 		return "ini_SECTION_INHERIT_EVENT"
     case ini_SECTION_ENTRY_EVENT:
@@ -201,9 +198,8 @@ const (
 	ini_FLOAT_TAG  = "float" // The tag 'float' for float values.
 	ini_BINARY_TAG = "binary"
     ini_MAP_TAG = "map"
-
-    ini_SECTION_TAG = "section"
-	ini_SECTION_INHERIT_TAG = "section_inherit"
+	
+	ini_SECTION_TAG = "map"
 
     ini_DEFAULT_SCALAR_TAG   = ini_STR_TAG // The default scalar tag is str
 )

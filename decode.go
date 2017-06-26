@@ -12,7 +12,6 @@ import (
 
 const (
 	documentNode = 1 << iota
-	sectionNode
 	inheritNode
 	mappingNode
 	scalarNode
@@ -98,10 +97,10 @@ func (p *parser) parse() *node {
 	switch p.event.typ {
 	case ini_DOCUMENT_START_EVENT:
 		return p.document()
-	case ini_SECTION_START_EVENT:
-		return p.section()
 	case ini_SECTION_INHERIT_EVENT:
 		return p.inherit()
+	case ini_SECTION_ENTRY_EVENT:
+		return p.mapping()
 	case ini_MAPPING_EVENT:
 		return p.mapping()
 	case ini_SCALAR_EVENT:
@@ -139,57 +138,60 @@ func (p *parser) document() *node {
 	p.doc = n
 	p.skip()
 	for p.event.typ != ini_DOCUMENT_END_EVENT {
-		if p.event.typ == ini_SECTION_START_EVENT {
-			n.children = append(n.children, p.parse())
-			p.skip()
-		}
-	}
-	return n
-}
-
-func (p *parser) section() *node {
-	thisNode := p.node(sectionNode)
-	thisNode.value = string(p.event.value)
-
-	// until next ini_SECTION_START_EVENT
-	p.skip()
-	parentNode := thisNode
-	for p.event.typ != ini_SECTION_START_EVENT {
-		currentNode := p.parse()
-		if currentNode.kind == inheritNode {
+		keyNode := p.parse()
+		nextNode := p.parse()
+		if nextNode.kind == inheritNode {
+			resolvedNode := p.parse()
 			// inherit
 			for i := 0; i < len(p.doc.children); i++ {
-				if p.doc.children[i].value == currentNode.value {
-					for _, childNode := range p.doc.children[i].children {
-						thisNode.children = append(thisNode.children, p.clone_node(childNode))
+				if p.doc.children[i].value == nextNode.value {
+					for _, childNode := range p.doc.children[i+1].children {
+                        resolvedNode.children = append(resolvedNode.children, p.clone_node(childNode))
 					}
 					break
 				}
 			}
-		} else if currentNode.kind == scalarNode {
-			nextNode := p.parse()
-			nodeExist := false
-			i := 0
-			for ; i < len(parentNode.children); i += 2 {
-				// condition:
-				// 1. current node type
-				// 1. current node value
-				// 2. next node type
-				if currentNode.kind == parentNode.children[i].kind && currentNode.value == parentNode.children[i].value &&
-					parentNode.children[i+1].kind == nextNode.kind {
-					nodeExist = true
-					break
-				}
-			}
-			if nodeExist {
-				parentNode = parentNode.children[i+1]
-			} else {
-				parentNode.children = append(parentNode.children, currentNode, nextNode)
-				if nextNode.kind == mappingNode {
-					parentNode = nextNode
-				}
+			n.children = append(n.children, keyNode, resolvedNode)
+		} else if nextNode.kind == mappingNode {
+			n.children = append(n.children, keyNode, nextNode)
+		}
+		p.skip()
+	}
+	return n
+}
+
+func (p *parser) mapping() *node {
+	thisNode := p.node(mappingNode)
+	// until next ini_SECTION_START_EVENT
+	p.skip()
+	parentNode := thisNode
+	currentNode := p.parse()
+	if currentNode.kind == scalarNode {
+		nextNode := p.parse()
+		nodeExist := false
+		i := 0
+		fmt.Println(parentNode.children)
+		for ; i < len(parentNode.children); i += 2 {
+			// condition:
+			// 1. current node type
+			// 1. current node value
+			// 2. next node type
+			if currentNode.kind == parentNode.children[i].kind && currentNode.value == parentNode.children[i].value &&
+				parentNode.children[i+1].kind == nextNode.kind {
+				nodeExist = true
+				break
 			}
 		}
+		fmt.Println(nodeExist)
+		if nodeExist {
+			parentNode = parentNode.children[i+1]
+		} else {
+			parentNode.children = append(parentNode.children, currentNode, nextNode)
+			if nextNode.kind == mappingNode {
+				parentNode = nextNode
+			}
+		}
+		fmt.Println(parentNode.children)
 	}
 	return thisNode
 }
@@ -203,13 +205,6 @@ func (p *parser) inherit() *node {
 
 func (p *parser) comment() *node {
 	thisNode := p.node(commentNode)
-	thisNode.value = string(p.event.value)
-	p.skip()
-	return thisNode
-}
-
-func (p *parser) mapping() *node {
-	thisNode := p.node(mappingNode)
 	thisNode.value = string(p.event.value)
 	p.skip()
 	return thisNode
@@ -315,15 +310,11 @@ func (d *decoder) unmarshal(n *node, out reflect.Value) (good bool) {
 	case documentNode:
 		return d.document(n, out)
 	}
-    fmt.Println(out.Kind())
 	out, unmarshaled, good := d.prepare(n, out)
 	if unmarshaled {
 		return good
 	}
-    fmt.Println(out.Kind())
 	switch n.kind {
-	case sectionNode:
-		good = d.section(n, out)
 	case mappingNode:
 		good = d.mapping(n, out)
 	case scalarNode:
@@ -349,11 +340,11 @@ func (d *decoder) document(n *node, out reflect.Value) (good bool) {
 				iface.Set(out)
 				return true
 			} else {
-				d.terror(n, ini_SECTION_TAG, out)
+				d.terror(n, ini_MAP_TAG, out)
 				return false
 			}
 		default:
-			d.terror(n, ini_SECTION_TAG, out)
+			d.terror(n, ini_MAP_TAG, out)
 			return false
 		}
 		outt := out.Type()
@@ -369,21 +360,23 @@ func (d *decoder) document(n *node, out reflect.Value) (good bool) {
 			out.Set(reflect.MakeMap(outt))
 		}
 		l := len(n.children)
-		for i := 0; i < l; i += 1 {
+		for i := 0; i < l; i += 2 {
 			k := reflect.New(kt).Elem()
-			e := reflect.New(et).Elem()
-			if d.unmarshal(n.children[i], e) {
+			if d.unmarshal(n.children[i], k) {
 				kkind := k.Kind()
 				if kkind == reflect.Interface {
 					kkind = k.Elem().Kind()
 				}
 				if kkind == reflect.Map || kkind == reflect.Slice {
-					failf("invalid section key: %#v", k.Interface())
+					failf("invalid map key: %#v", k.Interface())
 				}
-				k.SetString(n.children[i].value)
-				out.SetMapIndex(k, e)
+				e := reflect.New(et).Elem()
+                fmt.Println(n.children[i])
+                fmt.Println(n.children[i+1])
+				if d.unmarshal(n.children[i+1], e) {
+					out.SetMapIndex(k, e)
+				}
 			}
-
 		}
 		d.mapType = mapType
 		return true
@@ -404,59 +397,6 @@ func settableValueOf(i interface{}) reflect.Value {
 	sv := reflect.New(v.Type()).Elem()
 	sv.Set(v)
 	return sv
-}
-
-func (d *decoder) section(n *node, out reflect.Value) (good bool) {
-	switch out.Kind() {
-	case reflect.Struct:
-		return d.mappingStruct(n, out)
-	case reflect.Map:
-	// okay
-	case reflect.Interface:
-		if d.mapType.Kind() == reflect.Map {
-			iface := out
-			out = reflect.MakeMap(d.mapType)
-			iface.Set(out)
-			return true
-		} else {
-			d.terror(n, ini_SECTION_TAG, out)
-			return false
-		}
-	default:
-		d.terror(n, ini_SECTION_TAG, out)
-		return false
-	}
-	outt := out.Type()
-	kt := outt.Key()
-	et := outt.Elem()
-
-	mapType := d.mapType
-	if outt.Key() == ifaceType && outt.Elem() == ifaceType {
-		d.mapType = outt
-	}
-
-	if out.IsNil() {
-		out.Set(reflect.MakeMap(outt))
-	}
-	l := len(n.children)
-	for i := 0; i < l; i += 2 {
-		k := reflect.New(kt).Elem()
-		if d.unmarshal(n.children[i], k) {
-			kkind := k.Kind()
-			if kkind == reflect.Interface {
-				kkind = k.Elem().Kind()
-			}
-			if kkind == reflect.Map || kkind == reflect.Slice {
-				failf("invalid map key: %#v", k.Interface())
-			}
-			e := reflect.New(et).Elem()
-			if d.unmarshal(n.children[i+1], e) {
-				out.SetMapIndex(k, e)
-			}
-		}
-	}
-	d.mapType = mapType
-	return true
 }
 
 func (d *decoder) scalar(n *node, out reflect.Value) (good bool) {

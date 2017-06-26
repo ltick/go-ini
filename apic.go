@@ -144,15 +144,6 @@ func ini_document_end_event_initialize(event *ini_event_t) bool {
 	return true
 }
 
-// Create SECTION-ENTRY.
-func ini_section_event_initialize(event *ini_event_t, value []byte) bool {
-	*event = ini_event_t{
-		typ: ini_SECTION_START_EVENT,
-        value:   value,
-	}
-	return true
-}
-
 // Create ELEMENT.
 func ini_scalar_event_initialize(event *ini_event_t, value []byte, style ini_scalar_style_t) bool {
 	*event = ini_event_t{
