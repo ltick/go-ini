@@ -315,10 +315,12 @@ func (d *decoder) unmarshal(n *node, out reflect.Value) (good bool) {
 	case documentNode:
 		return d.document(n, out)
 	}
+    fmt.Println(out.Kind())
 	out, unmarshaled, good := d.prepare(n, out)
 	if unmarshaled {
 		return good
 	}
+    fmt.Println(out.Kind())
 	switch n.kind {
 	case sectionNode:
 		good = d.section(n, out)
@@ -695,7 +697,6 @@ func (d *decoder) mappingStruct(n *node, out reflect.Value) (good bool) {
 		inlineMap.Set(reflect.New(inlineMap.Type()).Elem())
 		elemType = inlineMap.Type().Elem()
 	}
-
 	for i := 0; i < l; i += 2 {
 		ni := n.children[i]
 		if !d.unmarshal(ni, name) {

@@ -483,6 +483,11 @@ func ini_parser_fetch_section_entry(parser *ini_parser_t) bool {
 	start_mark := parser.mark
 	skip(parser)
 	end_mark := parser.mark
+	if !is_breakz(parser.buffer, parser.buffer_pos) {
+		return ini_parser_set_scanner_error(parser,
+			"while scanning for the section start", parser.mark,
+			"found character("+string([]byte{parser.buffer[parser.buffer_pos]})+") that cannot end for any section start")
+	}
 	token := ini_token_t{
 		typ:        ini_SECTION_ENTRY_TOKEN,
 		start_mark: start_mark,

@@ -284,23 +284,29 @@ var unmarshalTests = []struct {
         "hello1= world\n[section:default]\nhello= world",
         map[string]map[string]interface{}{"default": map[string]interface{}{"hello1": "world"}, "section": map[string]interface{}{"hello1": "world", "hello": "world"}},
     }, {
-        "[default]hello1= world\n[section:default]\nhello= world",
+        "[default]\nhello1= world\n[section:default]\nhello= world",
         map[string]map[string]interface{}{"default": map[string]interface{}{"hello1": "world"}, "section": map[string]interface{}{"hello1": "world", "hello": "world"}},
     }, {
         "[default]\nhello.1= world\n[section:default]\nhello.2= world",
         map[string]map[string]map[int]string{"default": map[string]map[int]string{"hello":map[int]string{1: "world"}}, "section": map[string]map[int]string{"hello":map[int]string{1: "world", 2:"world"}}},
     }, {
-        "[default]hello.1= world",
+        "[default]\nhello.1= world",
         map[string]map[string]map[int]interface{}{"default": map[string]map[int]interface{}{"hello": map[int]interface{}{1:"world"}}},
     }, {
-        "[default]hello.1.2= world",
+        "[default]\nhello.1.2= world",
         map[string]map[string]map[int]map[int]string{"default": map[string]map[int]map[int]string{"hello": map[int]map[int]string{1:map[int]string{2:"world"}}}},
     }, {
-        "[default]hello.1= world\n[section:default]hello.1.2= world",
+        "[default]\nhello.1= world\n[section:default]\nhello.1.2= world",
         map[string]map[string]map[int]interface{}{"default": map[string]map[int]interface{}{"hello": map[int]interface{}{1:"world"}}, "section":map[string]map[int]interface{}{"hello": map[int]interface{}{1:map[interface{}]interface{}{2:"world"}}}},
     }, {
-        "[default]hello.1.2= world\n[section:default]hello.1= world",
+        "[default]\nhello.1.2= world\n[section:default]\nhello.1= world",
         map[string]map[string]map[int]interface{}{"default": map[string]map[int]interface{}{"hello": map[int]interface{}{1:map[interface{}]interface{}{2:"world"}}}, "section":map[string]map[int]interface{}{"hello": map[int]interface{}{1:"world"}}},
+    }, {
+        "[default]\nhello= world",
+        &struct{Default struct{Hello string}}{struct{Hello string}{"world"}},
+    }, {
+        "[section]\nhello= world",
+        &struct{Section struct{Hello string}}{struct{Hello string}{"world"}},
     },
 }
 
