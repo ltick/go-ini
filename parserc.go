@@ -196,14 +196,14 @@ func ini_parser_parse_section_entry(parser *ini_parser_t, event *ini_event_t) bo
 			typ:        ini_SECTION_ENTRY_EVENT,
 			start_mark: token.start_mark,
 			end_mark:   token.end_mark,
-			tag:        []byte(ini_MAP_TAG),
+			tag:        []byte(ini_SECTION_TAG),
 		}
 	} else {
 		*event = ini_event_t{
 			typ:        ini_SECTION_ENTRY_EVENT,
 			start_mark: token.start_mark,
 			end_mark:   token.start_mark,
-			tag:        []byte(ini_MAP_TAG),
+			tag:        []byte(ini_SECTION_TAG),
 		}
 	}
 	return true

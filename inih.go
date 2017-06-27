@@ -199,7 +199,7 @@ const (
 	ini_BINARY_TAG = "binary"
     ini_MAP_TAG = "map"
 	
-	ini_SECTION_TAG = "map"
+	ini_SECTION_TAG = "section"
 
     ini_DEFAULT_SCALAR_TAG   = ini_STR_TAG // The default scalar tag is str
 )

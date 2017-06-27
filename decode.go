@@ -13,6 +13,7 @@ import (
 const (
 	documentNode = 1 << iota
 	inheritNode
+	sectionNode
 	mappingNode
 	scalarNode
 	commentNode
@@ -100,7 +101,7 @@ func (p *parser) parse() *node {
 	case ini_SECTION_INHERIT_EVENT:
 		return p.inherit()
 	case ini_SECTION_ENTRY_EVENT:
-		return p.mapping()
+		return p.section()
 	case ini_MAPPING_EVENT:
 		return p.mapping()
 	case ini_SCALAR_EVENT:
@@ -133,6 +134,32 @@ func (p *parser) clone_node(n *node) *node {
 	return thisNode
 }
 
+func (p *parser) merge_node(targetNode *node, sourceNode *node) *node {
+	if targetNode.kind == sourceNode.kind {
+        targetNodeCount := len(targetNode.children)
+        sourceNodeCount := len(sourceNode.children)
+		for i := 0; i < targetNodeCount; i += 2 {
+			exists := false
+            sourceIndex := 0
+			for j := 0; j < sourceNodeCount; j += 2 {
+				if targetNode.children[i].kind == scalarNode && sourceNode.children[j].kind == scalarNode {
+					if targetNode.children[i].value == sourceNode.children[j].value {
+						exists = true
+                        sourceIndex = j
+						break
+					}
+				}
+			}
+			if exists {
+				targetNode.children[i+1] = p.merge_node(targetNode.children[i+1], sourceNode.children[sourceIndex+1])
+			} else {
+				targetNode.children = append(targetNode.children, sourceNode.children[sourceIndex], p.clone_node(sourceNode.children[sourceIndex+1]))
+			}
+		}
+	}
+	return targetNode
+}
+
 func (p *parser) document() *node {
 	n := p.node(documentNode)
 	p.doc = n
@@ -141,23 +168,57 @@ func (p *parser) document() *node {
 		keyNode := p.parse()
 		nextNode := p.parse()
 		if nextNode.kind == inheritNode {
-			resolvedNode := p.parse()
+			childNode := p.parse()
 			// inherit
-			for i := 0; i < len(p.doc.children); i++ {
-				if p.doc.children[i].value == nextNode.value {
-					for _, childNode := range p.doc.children[i+1].children {
-                        resolvedNode.children = append(resolvedNode.children, p.clone_node(childNode))
-					}
+			for i := 0; i < len(p.doc.children); i += 2 {
+				if p.doc.children[i].kind == scalarNode && p.doc.children[i].value == nextNode.value {
+					childNode = p.merge_node(childNode, p.doc.children[i+1])
 					break
 				}
 			}
-			n.children = append(n.children, keyNode, resolvedNode)
-		} else if nextNode.kind == mappingNode {
+			n.children = append(n.children, keyNode, childNode)
+		} else if nextNode.kind == sectionNode {
 			n.children = append(n.children, keyNode, nextNode)
 		}
 		p.skip()
 	}
 	return n
+}
+
+func (p *parser) section() *node {
+	thisNode := p.node(sectionNode)
+
+	// until next ini_SECTION_START_EVENT
+	p.skip()
+	parentNode := thisNode
+	for p.event.typ != ini_SECTION_ENTRY_EVENT {
+		currentNode := p.parse()
+		if currentNode.kind == scalarNode {
+			nextNode := p.parse()
+			nodeExist := false
+			i := 0
+			for ; i < len(parentNode.children); i += 2 {
+				// condition:
+				// 1. current node type
+				// 1. current node value
+				// 2. next node type
+				if currentNode.kind == parentNode.children[i].kind && currentNode.value == parentNode.children[i].value &&
+					parentNode.children[i+1].kind == nextNode.kind {
+					nodeExist = true
+					break
+				}
+			}
+			if nodeExist {
+				parentNode = parentNode.children[i+1]
+			} else {
+				parentNode.children = append(parentNode.children, currentNode, nextNode)
+				if nextNode.kind == mappingNode {
+					parentNode = nextNode
+				}
+			}
+		}
+	}
+	return thisNode
 }
 
 func (p *parser) mapping() *node {
@@ -170,7 +231,6 @@ func (p *parser) mapping() *node {
 		nextNode := p.parse()
 		nodeExist := false
 		i := 0
-		fmt.Println(parentNode.children)
 		for ; i < len(parentNode.children); i += 2 {
 			// condition:
 			// 1. current node type
@@ -182,7 +242,6 @@ func (p *parser) mapping() *node {
 				break
 			}
 		}
-		fmt.Println(nodeExist)
 		if nodeExist {
 			parentNode = parentNode.children[i+1]
 		} else {
@@ -191,7 +250,6 @@ func (p *parser) mapping() *node {
 				parentNode = nextNode
 			}
 		}
-		fmt.Println(parentNode.children)
 	}
 	return thisNode
 }
@@ -282,7 +340,7 @@ func (d *decoder) callUnmarshaler(n *node, u Unmarshaler) (good bool) {
 //
 // If n holds a null value, prepare returns before doing anything.
 func (d *decoder) prepare(n *node, out reflect.Value) (newout reflect.Value, unmarshaled, good bool) {
-	if n.value == "null" || n.value == "" {
+	if n.kind == scalarNode && (n.value == "null" || n.value == "") {
 		return out, false, false
 	}
 	again := true
@@ -292,6 +350,7 @@ func (d *decoder) prepare(n *node, out reflect.Value) (newout reflect.Value, unm
 			if out.IsNil() {
 				out.Set(reflect.New(out.Type().Elem()))
 			}
+
 			out = out.Elem()
 			again = true
 		}
@@ -315,6 +374,8 @@ func (d *decoder) unmarshal(n *node, out reflect.Value) (good bool) {
 		return good
 	}
 	switch n.kind {
+	case sectionNode:
+		good = d.mapping(n, out)
 	case mappingNode:
 		good = d.mapping(n, out)
 	case scalarNode:
@@ -371,8 +432,6 @@ func (d *decoder) document(n *node, out reflect.Value) (good bool) {
 					failf("invalid map key: %#v", k.Interface())
 				}
 				e := reflect.New(et).Elem()
-                fmt.Println(n.children[i])
-                fmt.Println(n.children[i+1])
 				if d.unmarshal(n.children[i+1], e) {
 					out.SetMapIndex(k, e)
 				}
@@ -630,6 +689,7 @@ func (d *decoder) mappingStruct(n *node, out reflect.Value) (good bool) {
 	}
 	name := settableValueOf("")
 	l := len(n.children)
+
 	var inlineMap reflect.Value
 	var elemType reflect.Type
 	if sinfo.InlineMap != -1 {
