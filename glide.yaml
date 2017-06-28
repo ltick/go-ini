@@ -1,1 +1,8 @@
-package: github.com/ltick/tick-config-ini
+package: tick-config-ini
+license: Apache-2.0
+owners:
+- name: Sam Ding
+  email: sam42@outlook.com.com
+  homepage: http://ltick.com
+import:
+- package: gopkg.in/check.v1
