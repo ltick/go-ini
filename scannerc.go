@@ -547,10 +547,10 @@ func ini_parser_fetch_key(parser *ini_parser_t) bool {
 		}
 	} else if parser.buffer[parser.buffer_pos] == '"' {
 		// key must start with alpha([0-9a-zA-Z_-])
-		if !is_alpha(parser.buffer, parser.buffer_pos) && parser.buffer[parser.buffer_pos] != '~' {
+		if !is_alpha(parser.buffer, parser.buffer_pos+1) && parser.buffer[parser.buffer_pos+1] != '~' {
 			return ini_parser_set_scanner_error(parser,
 				"while scanning for the plain scalar", parser.mark,
-				"found character("+string([]byte{parser.buffer[parser.buffer_pos]})+") that cannot start for any value")
+				"found character("+string([]byte{parser.buffer[parser.buffer_pos+1]})+") that cannot start for any value")
 		}
 		if !ini_parser_scan_scalar(parser, &key_token, false) {
 			return false
