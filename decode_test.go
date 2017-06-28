@@ -278,14 +278,17 @@ var unmarshalTests = []struct {
 		"[section]\nhello= world",
 		map[string]map[string]string{"section": map[string]string{"hello": "world"}},
 	}, {
-		"hello1= world[section:default]\nhello= world",
-		map[string]map[string]interface{}{"default": map[string]interface{}{"hello1": "world[section:default]", "hello": "world"}},
+		"#comment\n[section]\nhello= world",
+		map[string]map[string]string{"section": map[string]string{"hello": "world"}},
 	}, {
-		"hello1= world\n[section:default]\nhello= world",
-		map[string]map[string]interface{}{"default": map[string]interface{}{"hello1": "world"}, "section": map[string]interface{}{"hello1": "world", "hello": "world"}},
+		"hello_= world[section:default]\nhello= world",
+		map[string]map[string]interface{}{"default": map[string]interface{}{"hello_": "world[section:default]", "hello": "world"}},
 	}, {
-		"[default]\nhello1= world\n[section:default]\nhello= world",
-		map[string]map[string]interface{}{"default": map[string]interface{}{"hello1": "world"}, "section": map[string]interface{}{"hello1": "world", "hello": "world"}},
+		"hello_= world\n[section:default]\nhello= world",
+		map[string]map[string]interface{}{"default": map[string]interface{}{"hello_": "world"}, "section": map[string]interface{}{"hello_": "world", "hello": "world"}},
+	}, {
+		"[default]\nhello_= world\n[section:default]\nhello= world",
+		map[string]map[string]interface{}{"default": map[string]interface{}{"hello_": "world"}, "section": map[string]interface{}{"hello_": "world", "hello": "world"}},
 	}, {
 		"[default]\nhello.1= world\n[section:default]\nhello.2= world",
 		map[string]map[string]map[int]string{"default": map[string]map[int]string{"hello": map[int]string{1: "world"}}, "section": map[string]map[int]string{"hello": map[int]string{1: "world", 2: "world"}}},
@@ -325,6 +328,37 @@ var unmarshalTests = []struct {
 				Hello_ string
 			}
 		}{struct{ Hello string }{"world"}, &struct{ Hello_ string }{"world_1"}},
+	}, {
+		"hello= world\n[section:default]\nhello_= world_1",
+		&struct {
+			Default struct {
+				Hello string
+			}
+			Section *struct {
+				Hello_ string
+			}
+		}{struct{ Hello string }{"world"}, &struct{ Hello_ string }{"world_1"}},
+	}, {
+		"[default]\nhello.a= world\n[section:default]\nhello.a.b= world",
+		&struct {
+			Default struct {
+				Hello struct {
+					A string
+				}
+			}
+			Section struct {
+				Hello struct {
+					A struct {
+						B string
+					}
+				}
+			}
+		}{
+			struct{ Hello struct{ A string } }{struct{ A string }{"world"}},
+			struct {
+				Hello struct{ A struct{ B string } }
+			}{struct{ A struct{ B string } }{struct{ B string }{"world"}}},
+		},
 	},
 }
 
