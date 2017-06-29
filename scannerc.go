@@ -546,12 +546,6 @@ func ini_parser_fetch_key(parser *ini_parser_t) bool {
 			return false
 		}
 	} else if parser.buffer[parser.buffer_pos] == '"' {
-		// key must start with alpha([0-9a-zA-Z_-])
-		if !is_alpha(parser.buffer, parser.buffer_pos+1) && parser.buffer[parser.buffer_pos+1] != '~' {
-			return ini_parser_set_scanner_error(parser,
-				"while scanning for the plain scalar", parser.mark,
-				"found character("+string([]byte{parser.buffer[parser.buffer_pos+1]})+") that cannot start for any value")
-		}
 		if !ini_parser_scan_scalar(parser, &key_token, false) {
 			return false
 		}
@@ -560,7 +554,6 @@ func ini_parser_fetch_key(parser *ini_parser_t) bool {
 			return false
 		}
 	}
-    
 	keys := bytes.Split(key_token.value, []byte("."))
 	key_len := len(keys)
 	key_start_mark := key_token.start_mark
@@ -658,10 +651,10 @@ func ini_parser_scan_scalar(parser *ini_parser_t, token *ini_token_t, single boo
 				skip(parser)
 			} else if parser.buffer[parser.buffer_pos] == '\'' {
 				// It is a left single quote.
-				skip(parser)
 				if parser.unread < 1 && !ini_parser_update_buffer(parser, 1) {
 					return false
 				}
+                skip(parser)
 				// It is a non-escaped non-blank character.
 				for parser.buffer[parser.buffer_pos] != '\'' {
 					if parser.unread < 1 && !ini_parser_update_buffer(parser, 1) {
@@ -675,8 +668,8 @@ func ini_parser_scan_scalar(parser *ini_parser_t, token *ini_token_t, single boo
 				if parser.unread < 1 && !ini_parser_update_buffer(parser, 1) {
 					return false
 				}
-				skip(parser)
-				break
+                skip(parser)
+                break
 			}
 		} else {
 			if parser.buffer[parser.buffer_pos] == '"' && parser.buffer[parser.buffer_pos+1] == '"' {
@@ -691,12 +684,11 @@ func ini_parser_scan_scalar(parser *ini_parser_t, token *ini_token_t, single boo
 				skip(parser)
 				// It is a non-escaped non-blank character.
 				for parser.buffer[parser.buffer_pos] != '"' {
-					if parser.unread < 1 && !ini_parser_update_buffer(parser, 1) {
-						return false
+                    if parser.unread < 1 || !ini_parser_update_buffer(parser, 1) {
+						break
 					}
 					s = read(parser, s)
 				}
-				break
 			} else if parser.buffer[parser.buffer_pos] == '\\' && is_break(parser.buffer, parser.buffer_pos+1) {
 				// It is an escaped line break.
 				if parser.unread < 3 && !ini_parser_update_buffer(parser, 3) {
@@ -828,7 +820,6 @@ func ini_parser_scan_scalar(parser *ini_parser_t, token *ini_token_t, single boo
 			break
 		}
 	}
-
 	// Eat the right quote.
 	end_mark := parser.mark
 

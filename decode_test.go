@@ -275,7 +275,7 @@ var unmarshalTests = []struct {
 
 	// section conversions.
 	{
-		"[section]\nhello= world",
+		"[section]\n'hello'= \"world\"",
 		map[string]map[string]string{"section": map[string]string{"hello": "world"}},
 	}, {
 		"#comment\n[section]\nhello= world",
