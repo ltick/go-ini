@@ -845,7 +845,7 @@ func ini_parser_scan_plain_scalar(parser *ini_parser_t, token *ini_token_t) bool
 	// Consume the content of the plain scalar.
 	for !is_breakz(parser.buffer, parser.buffer_pos) {
 		// Check for a comment.
-		if parser.buffer[parser.buffer_pos] == '#' {
+		if parser.buffer[parser.buffer_pos] == '#' || parser.buffer[parser.buffer_pos] == ';'{
 			break
 		}
 		if parser.buffer[parser.buffer_pos] == '=' {

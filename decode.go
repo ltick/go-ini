@@ -200,25 +200,23 @@ func (p *parser) section() *node {
 			for ; i < len(parentNode.children); i += 2 {
 				// condition:
 				// 1. current node type
-				// 1. current node value
-				// 2. next node type
-				if currentNode.kind == parentNode.children[i].kind && currentNode.value == parentNode.children[i].value &&
-					parentNode.children[i+1].kind == nextNode.kind {
+				// 2. current node value
+				if currentNode.kind == parentNode.children[i].kind && currentNode.value == parentNode.children[i].value {
 					nodeExist = true
+                    // if next level of node type is different, overwrite it
+                    if len(parentNode.children[i+1].children) > 0 && len(nextNode.children) > 0 {
+                        if parentNode.children[i+1].children[1].kind != nextNode.children[1].kind {
+                            parentNode.children[i+1] = nextNode
+                        }
+                    }
 					break
 				}
 			}
-			if nodeExist {
-                if len(parentNode.children) > 0 {
-                    parentNode = parentNode.children[i + 1]
-                }
-			} else {
+			if !nodeExist {
 				parentNode.children = append(parentNode.children, currentNode, nextNode)
-				if nextNode.kind == mappingNode {
-					parentNode = nextNode
-				}
 			}
 		}
+		parentNode = thisNode
 	}
 	return thisNode
 }
@@ -236,23 +234,25 @@ func (p *parser) mapping() *node {
 		for ; i < len(parentNode.children); i += 2 {
 			// condition:
 			// 1. current node type
-			// 1. current node value
-			// 2. next node type
-			if currentNode.kind == parentNode.children[i].kind && currentNode.value == parentNode.children[i].value &&
-				parentNode.children[i+1].kind == nextNode.kind {
+			// 2. current node value
+			if currentNode.kind == parentNode.children[i].kind && currentNode.value == parentNode.children[i].value {
 				nodeExist = true
 				break
 			}
 		}
 		if nodeExist {
 			if len(parentNode.children) > 0 {
+				// if node type is different, overwrite it
+				if parentNode.children[i+1].kind != nextNode.kind {
+					parentNode.children[i+1] = nextNode
+				}
 				parentNode = parentNode.children[i+1]
 			}
 		} else {
 			parentNode.children = append(parentNode.children, currentNode, nextNode)
-			if nextNode.kind == mappingNode {
-				parentNode = nextNode
-			}
+		}
+		if nextNode.kind == mappingNode {
+			parentNode = nextNode
 		}
 	}
 	return thisNode
@@ -396,6 +396,8 @@ func (d *decoder) document(n *node, out reflect.Value) (good bool) {
 		switch out.Kind() {
 		case reflect.Struct:
 			return d.mappingStruct(n, out)
+		case reflect.Slice:
+			return d.mappingSlice(n, out)
 		case reflect.Map:
 		// okay
 		case reflect.Interface:
@@ -403,10 +405,13 @@ func (d *decoder) document(n *node, out reflect.Value) (good bool) {
 				iface := out
 				out = reflect.MakeMap(d.mapType)
 				iface.Set(out)
-				return true
 			} else {
-				d.terror(n, ini_MAP_TAG, out)
-				return false
+				slicev := reflect.New(d.mapType).Elem()
+				if !d.mappingSlice(n, slicev) {
+					return false
+				}
+				out.Set(slicev)
+				return true
 			}
 		default:
 			d.terror(n, ini_MAP_TAG, out)

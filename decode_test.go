@@ -299,6 +299,9 @@ var unmarshalTests = []struct {
 		"[default]\nhello.1.2= world",
 		map[string]map[string]map[int]map[int]string{"default": map[string]map[int]map[int]string{"hello": map[int]map[int]string{1: map[int]string{2: "world"}}}},
 	}, {
+        "[default]\nhello.1= world\nhello.1.2= world",
+        map[string]map[string]map[int]map[int]string{"default": map[string]map[int]map[int]string{"hello": map[int]map[int]string{1: map[int]string{2: "world"}}}},
+    }, {
 		"[default]\nhello.1= world\n[section:default]\nhello.1.2= world",
 		map[string]map[string]map[int]interface{}{"default": map[string]map[int]interface{}{"hello": map[int]interface{}{1: "world"}}, "section": map[string]map[int]interface{}{"hello": map[int]interface{}{1: map[interface{}]interface{}{2: "world"}}}},
 	}, {
@@ -379,6 +382,10 @@ func (s *S) TestUnmarshal(c *C) {
 			c.Fatalf("missing case for %s", typ)
 		}
 		err := ini.Unmarshal([]byte(item.data), value)
+        //fmt.Println("---")
+        //fmt.Println(item.data)
+        //fmt.Println(value)
+        //fmt.Println("===")
 		if _, ok := err.(*ini.TypeError); !ok {
 			c.Assert(err, IsNil)
 		}
