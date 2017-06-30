@@ -2,10 +2,10 @@ package ini_test
 
 import (
 	"errors"
-	"fmt"
 	. "gopkg.in/check.v1"
 	"math"
 	"reflect"
+
 	"tick-config-ini"
 )
 
@@ -382,12 +382,6 @@ func (s *S) TestUnmarshal(c *C) {
 		if _, ok := err.(*ini.TypeError); !ok {
 			c.Assert(err, IsNil)
 		}
-		fmt.Println("===")
-		fmt.Println(item.data)
-		fmt.Println("---")
-		fmt.Println(item.value)
-		fmt.Println(value)
-		fmt.Println("---")
 		if typ.Kind() == reflect.String {
 			c.Assert(*value.(*string), Equals, item.value)
 		} else {
@@ -396,11 +390,27 @@ func (s *S) TestUnmarshal(c *C) {
 	}
 }
 
-/*
-func TestUnmarshalNaN(t *testing.T) {
-	value := map[string]interface{}{}
-	err := ini.Unmarshal([]byte("notanum: .NaN"), &value)
-	assert.Nil(t, err)
-	assert.Equal(t, math.IsNaN(value["notanum"].(float64)), true)
+func (s *S)  TestUnmarshalNaN(c *C) {
+	var value map[string]map[string]interface{}
+	err := ini.Unmarshal([]byte("notanum= .NaN"), &value)
+
+	c.Assert(err, IsNil)
+	c.Assert(math.IsNaN(value["default"]["notanum"].(float64)), Equals, true)
 }
-*/
+
+var unmarshalErrorTests = []struct {
+	data, error string
+}{
+	{
+		"[section]'hello'= \"world\"",
+		"ini: found character\\('\\) that cannot end for any section entry",
+	},
+}
+
+func (s *S) TestUnmarshalErrors(c *C) {
+	for _, item := range unmarshalErrorTests {
+		var value interface{}
+		err := ini.Unmarshal([]byte(item.data), &value)
+		c.Assert(err, ErrorMatches, item.error, Commentf("Partial unmarshal: %#v", value))
+	}
+}

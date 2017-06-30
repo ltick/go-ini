@@ -136,16 +136,16 @@ func (p *parser) clone_node(n *node) *node {
 
 func (p *parser) merge_node(targetNode *node, sourceNode *node) *node {
 	if targetNode.kind == sourceNode.kind {
-        targetNodeCount := len(targetNode.children)
-        sourceNodeCount := len(sourceNode.children)
+		targetNodeCount := len(targetNode.children)
+		sourceNodeCount := len(sourceNode.children)
 		for i := 0; i < targetNodeCount; i += 2 {
 			exists := false
-            sourceIndex := 0
+			sourceIndex := 0
 			for j := 0; j < sourceNodeCount; j += 2 {
 				if targetNode.children[i].kind == scalarNode && sourceNode.children[j].kind == scalarNode {
 					if targetNode.children[i].value == sourceNode.children[j].value {
 						exists = true
-                        sourceIndex = j
+						sourceIndex = j
 						break
 					}
 				}
@@ -209,7 +209,9 @@ func (p *parser) section() *node {
 				}
 			}
 			if nodeExist {
-				parentNode = parentNode.children[i+1]
+                if len(parentNode.children) > 0 {
+                    parentNode = parentNode.children[i + 1]
+                }
 			} else {
 				parentNode.children = append(parentNode.children, currentNode, nextNode)
 				if nextNode.kind == mappingNode {
@@ -243,7 +245,9 @@ func (p *parser) mapping() *node {
 			}
 		}
 		if nodeExist {
-			parentNode = parentNode.children[i+1]
+			if len(parentNode.children) > 0 {
+				parentNode = parentNode.children[i+1]
+			}
 		} else {
 			parentNode.children = append(parentNode.children, currentNode, nextNode)
 			if nextNode.kind == mappingNode {

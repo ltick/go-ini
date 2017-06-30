@@ -1,11 +1,8 @@
 package ini_test
 
-/*
 import (
-	"fmt"
-	//"reflect"
-	"github.com/ltick/tick-config"
 	"testing"
+    "tick-config-ini"
 )
 
 
@@ -36,9 +33,8 @@ string_2.2 = "testing_dev"
 CaseInsensitive = true
 `
 	)
-	iniConf := make(map[string]interface{})
+	var iniConf map[string]interface{}
 	err := ini.Unmarshal([]byte(iniContext), &iniConf)
-	fmt.Println(iniConf)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -46,4 +42,3 @@ CaseInsensitive = true
 	//buf, err := Marshal(reflect.ValueOf(iniConf))
 	//fmt.Println(buf)
 }
-*/
