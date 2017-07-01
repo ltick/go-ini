@@ -7,6 +7,7 @@ import (
 	"reflect"
 
 	"tick-config-ini"
+    "fmt"
 )
 
 var failingErr = errors.New("failingErr")
@@ -299,6 +300,9 @@ var unmarshalTests = []struct {
 		"[default]\nhello.1.2= world",
 		map[string]map[string]map[int]map[int]string{"default": map[string]map[int]map[int]string{"hello": map[int]map[int]string{1: map[int]string{2: "world"}}}},
 	}, {
+        "[default]\nhello= world\nhello.1= world_1",
+        map[string]map[string]map[int]string{"default": map[string]map[int]string{"hello": map[int]string{1: "world_1"}}},
+    }, {
         "[default]\nhello.1= world\nhello.1.2= world",
         map[string]map[string]map[int]map[int]string{"default": map[string]map[int]map[int]string{"hello": map[int]map[int]string{1: map[int]string{2: "world"}}}},
     }, {
@@ -382,10 +386,10 @@ func (s *S) TestUnmarshal(c *C) {
 			c.Fatalf("missing case for %s", typ)
 		}
 		err := ini.Unmarshal([]byte(item.data), value)
-        //fmt.Println("---")
-        //fmt.Println(item.data)
-        //fmt.Println(value)
-        //fmt.Println("===")
+        fmt.Println("---")
+        fmt.Println(item.data)
+        fmt.Println(value)
+        fmt.Println("===")
 		if _, ok := err.(*ini.TypeError); !ok {
 			c.Assert(err, IsNil)
 		}

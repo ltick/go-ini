@@ -139,21 +139,24 @@ func (p *parser) merge_node(targetNode *node, sourceNode *node) *node {
 		targetNodeCount := len(targetNode.children)
 		sourceNodeCount := len(sourceNode.children)
 		for i := 0; i < targetNodeCount; i += 2 {
-			exists := false
-			sourceIndex := 0
+			nodeExist := false
+			nodeExistIndex := 0
 			for j := 0; j < sourceNodeCount; j += 2 {
 				if targetNode.children[i].kind == scalarNode && sourceNode.children[j].kind == scalarNode {
 					if targetNode.children[i].value == sourceNode.children[j].value {
-						exists = true
-						sourceIndex = j
+						nodeExist = true
+						nodeExistIndex = j
+						if len(targetNode.children[i+1].children) > 0 && len(sourceNode.children[j+1].children) > 0 {
+							if targetNode.children[i+1].children[1].kind == sourceNode.children[j+1].children[1].kind {
+								targetNode.children[i+1] = p.merge_node(targetNode.children[i+1], sourceNode.children[j+1])
+							}
+						}
 						break
 					}
 				}
 			}
-			if exists {
-				targetNode.children[i+1] = p.merge_node(targetNode.children[i+1], sourceNode.children[sourceIndex+1])
-			} else {
-				targetNode.children = append(targetNode.children, sourceNode.children[sourceIndex], p.clone_node(sourceNode.children[sourceIndex+1]))
+			if !nodeExist {
+				targetNode.children = append(targetNode.children, sourceNode.children[nodeExistIndex], p.clone_node(sourceNode.children[nodeExistIndex+1]))
 			}
 		}
 	}
@@ -195,20 +198,31 @@ func (p *parser) section() *node {
 		currentNode := p.parse()
 		if currentNode.kind == scalarNode {
 			nextNode := p.parse()
-			nodeExist := false
-			i := 0
-			for ; i < len(parentNode.children); i += 2 {
+			// discard different type of node
+			swapChildNodes := make([]*node, 0)
+			for i := 0; i < len(parentNode.children); i += 2 {
+				if parentNode.children[i+1].kind == nextNode.kind {
+					swapChildNodes = append(swapChildNodes, parentNode.children[i], parentNode.children[i+1])
+				}
+			}
+			parentNode.children = swapChildNodes
+
+            nodeExist := false
+			for i := 0; i < len(parentNode.children); i += 2 {
 				// condition:
 				// 1. current node type
 				// 2. current node value
 				if currentNode.kind == parentNode.children[i].kind && currentNode.value == parentNode.children[i].value {
 					nodeExist = true
-                    // if next level of node type is different, overwrite it
-                    if len(parentNode.children[i+1].children) > 0 && len(nextNode.children) > 0 {
-                        if parentNode.children[i+1].children[1].kind != nextNode.children[1].kind {
-                            parentNode.children[i+1] = nextNode
-                        }
-                    }
+					// if child nodes type is different, overwrite it
+					if len(parentNode.children[i+1].children) > 0 {
+						for _, brotherNode := range parentNode.children[i+1].children {
+							if brotherNode.kind != nextNode.kind {
+								parentNode.children[i + 1] = nextNode
+							}
+						}
+
+					}
 					break
 				}
 			}
