@@ -201,8 +201,12 @@ func (p *parser) section() *node {
 			// discard different type of node
 			swapChildNodes := make([]*node, 0)
 			for i := 0; i < len(parentNode.children); i += 2 {
-				if parentNode.children[i+1].kind == nextNode.kind {
-					swapChildNodes = append(swapChildNodes, parentNode.children[i], parentNode.children[i+1])
+				if parentNode.children[i].value == currentNode.value{
+					if parentNode.children[i+1].kind == nextNode.kind {
+						swapChildNodes = append(swapChildNodes, parentNode.children[i], parentNode.children[i + 1])
+					}
+				} else {
+					swapChildNodes = append(swapChildNodes, parentNode.children[i], parentNode.children[i + 1])
 				}
 			}
 			parentNode.children = swapChildNodes
