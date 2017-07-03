@@ -32,7 +32,7 @@ var unmarshalTests = []struct {
 		map[string]map[string]string{"default": map[string]string{"v": "true"}},
 	}, {
 		"v =true",
-		map[string]map[string]interface{}{"default": map[string]interface{}{"v": true}},
+		map[string]map[string]bool{"default": map[string]bool{"v": true}},
 	}, {
 		"v = 10",
 		map[string]map[string]interface{}{"default": map[string]interface{}{"v": 10}},
@@ -420,6 +420,7 @@ var unmarshalErrorTests = []struct {
 		"ini: found character\\('\\) that cannot end for any section entry",
 	},
 }
+
 
 func (s *S) TestUnmarshalErrors(c *C) {
 	for _, item := range unmarshalErrorTests {

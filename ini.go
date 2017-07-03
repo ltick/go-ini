@@ -131,10 +131,6 @@ func (e *TypeError) Error() string {
 type structInfo struct {
 	FieldsMap  map[string]fieldInfo
 	FieldsList []fieldInfo
-
-	// InlineMap is the number of the field in the struct that
-	// contains an ,inline map, or -1 if there's none.
-	InlineMap int
 }
 
 type fieldInfo struct {
@@ -161,7 +157,6 @@ func getStructInfo(st reflect.Type) (*structInfo, error) {
 	n := st.NumField()
 	fieldsMap := make(map[string]fieldInfo)
 	fieldsList := make([]fieldInfo, 0, n)
-	inlineMap := -1
 	for i := 0; i != n; i++ {
 		field := st.Field(i)
 		if field.PkgPath != "" && !field.Anonymous {
@@ -170,64 +165,11 @@ func getStructInfo(st reflect.Type) (*structInfo, error) {
 
 		info := fieldInfo{Num: i}
 
-		tag := field.Tag.Get("yaml")
+		tag := field.Tag.Get("ini")
 		if tag == "" && strings.Index(string(field.Tag), ":") < 0 {
 			tag = string(field.Tag)
 		}
 		if tag == "-" {
-			continue
-		}
-
-		inline := false
-		fields := strings.Split(tag, ",")
-		if len(fields) > 1 {
-			for _, flag := range fields[1:] {
-				switch flag {
-				case "omitempty":
-					info.OmitEmpty = true
-				case "flow":
-					info.Flow = true
-				case "inline":
-					inline = true
-				default:
-					return nil, errors.New(fmt.Sprintf("Unsupported flag %q in tag %q of type %s", flag, tag, st))
-				}
-			}
-			tag = fields[0]
-		}
-
-		if inline {
-			switch field.Type.Kind() {
-			case reflect.Map:
-				if inlineMap >= 0 {
-					return nil, errors.New("Multiple ,inline maps in struct " + st.String())
-				}
-				if field.Type.Key() != reflect.TypeOf("") {
-					return nil, errors.New("Option ,inline needs a map with string keys in struct " + st.String())
-				}
-				inlineMap = info.Num
-			case reflect.Struct:
-				sinfo, err := getStructInfo(field.Type)
-				if err != nil {
-					return nil, err
-				}
-				for _, finfo := range sinfo.FieldsList {
-					if _, found := fieldsMap[finfo.Key]; found {
-						msg := "Duplicated key '" + finfo.Key + "' in struct " + st.String()
-						return nil, errors.New(msg)
-					}
-					if finfo.Inline == nil {
-						finfo.Inline = []int{i, finfo.Num}
-					} else {
-						finfo.Inline = append([]int{i}, finfo.Inline...)
-					}
-					fieldsMap[finfo.Key] = finfo
-					fieldsList = append(fieldsList, finfo)
-				}
-			default:
-				//return nil, errors.New("Option ,inline needs a struct value or map field")
-				return nil, errors.New("Option ,inline needs a struct value field")
-			}
 			continue
 		}
 
@@ -246,7 +188,7 @@ func getStructInfo(st reflect.Type) (*structInfo, error) {
 		fieldsMap[info.Key] = info
 	}
 
-	sinfo = &structInfo{fieldsMap, fieldsList, inlineMap}
+	sinfo = &structInfo{fieldsMap, fieldsList}
 
 	fieldMapMutex.Lock()
 	structMap[st] = sinfo
