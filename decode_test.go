@@ -6,7 +6,6 @@ import (
 	"math"
 	"reflect"
 
-	"fmt"
 	"tick-config-ini"
 )
 
@@ -35,13 +34,13 @@ var unmarshalTests = []struct {
 		map[string]map[string]bool{"default": map[string]bool{"v": true}},
 	}, {
 		"v = 10",
-		map[string]map[string]interface{}{"default": map[string]interface{}{"v": 10}},
+		map[string]map[string]interface{}{"default": map[string]interface{}{"v": "10"}},
 	}, {
 		"v= 0b10",
-		map[string]map[string]interface{}{"default": map[string]interface{}{"v": 2}},
+		map[string]map[string]uint{"default": map[string]uint{"v": 2}},
 	}, {
 		"v= 0xA",
-		map[string]map[string]interface{}{"default": map[string]interface{}{"v": 10}},
+		map[string]map[string]int{"default": map[string]int{"v": 10}},
 	}, {
 		"v= 4294967296",
 		map[string]map[string]int64{"default": map[string]int64{"v": 4294967296}},
@@ -50,13 +49,13 @@ var unmarshalTests = []struct {
 		map[string]map[string]interface{}{"default": map[string]interface{}{"v": 0.1}},
 	}, {
 		"v= .1",
-		map[string]map[string]interface{}{"default": map[string]interface{}{"v": 0.1}},
+		map[string]map[string]float64{"default": map[string]float64{"v": 0.1}},
 	}, {
 		"v= -10",
-		map[string]map[string]interface{}{"default": map[string]interface{}{"v": -10}},
+		map[string]map[string]int{"default": map[string]int{"v": -10}},
 	}, {
 		"v= -.1",
-		map[string]map[string]interface{}{"default": map[string]interface{}{"v": -0.1}},
+		map[string]map[string]float32{"default": map[string]float32{"v": -0.1}},
 	},
 
 	// Floats from spec
@@ -65,28 +64,28 @@ var unmarshalTests = []struct {
 		map[string]map[string]interface{}{"default": map[string]interface{}{"canonical": 6.8523e+5}},
 	}, {
 		"expo= 685.230_15e+03",
-		map[string]map[string]interface{}{"default": map[string]interface{}{"expo": 685.23015e+03}},
+		map[string]map[string]float64{"default": map[string]float64{"expo": 685.23015e+03}},
+	}, {
+		"fixed= 685_230.15",
+		map[string]map[string]float32{"default": map[string]float32{"fixed": 685230.15}},
 	}, {
 		"fixed= 685_230.15",
 		map[string]map[string]interface{}{"default": map[string]interface{}{"fixed": 685230.15}},
-	}, {
-		"fixed= 685_230.15",
-		map[string]map[string]float64{"default": map[string]float64{"fixed": 685230.15}},
 	},
 
 	// Bools from spec
 	{
 		"canonical= y",
-		map[string]map[string]interface{}{"default": map[string]interface{}{"canonical": true}},
+		map[string]map[string]bool{"default": map[string]bool{"canonical": true}},
 	}, {
 		"answer= NO",
-		map[string]map[string]interface{}{"default": map[string]interface{}{"answer": false}},
+		map[string]map[string]interface{}{"default": map[string]interface{}{"answer": "false"}},
 	}, {
 		"logical= True",
-		map[string]map[string]interface{}{"default": map[string]interface{}{"logical": true}},
+		map[string]map[string]bool{"default": map[string]bool{"logical": true}},
 	}, {
 		"option= on",
-		map[string]map[string]interface{}{"default": map[string]interface{}{"option": true}},
+		map[string]map[string]interface{}{"default": map[string]interface{}{"option": "true"}},
 	}, {
 		"option= on",
 		map[string]map[string]bool{"default": map[string]bool{"option": true}},
@@ -94,22 +93,22 @@ var unmarshalTests = []struct {
 	// Ints from spec
 	{
 		"canonical= 685230",
-		map[string]map[string]interface{}{"default": map[string]interface{}{"canonical": 685230}},
+		map[string]map[string]int{"default": map[string]int{"canonical": 685230}},
 	}, {
 		"decimal= +685_230",
-		map[string]map[string]interface{}{"default": map[string]interface{}{"decimal": 685230}},
+		map[string]map[string]interface{}{"default": map[string]interface{}{"decimal": "685230"}},
 	}, {
 		"octal = 02472256",
-		map[string]map[string]interface{}{"default": map[string]interface{}{"octal": 685230}},
+		map[string]map[string]uint{"default": map[string]uint{"octal": 685230}},
 	}, {
 		"hexa =  0x_0A_74_AE",
-		map[string]map[string]interface{}{"default": map[string]interface{}{"hexa": 685230}},
+		map[string]map[string]int{"default": map[string]int{"hexa": 685230}},
 	}, {
 		"bin= 0b1010_0111_0100_1010_1110",
-		map[string]map[string]interface{}{"default": map[string]interface{}{"bin": 685230}},
+		map[string]map[string]uint{"default": map[string]uint{"bin": 685230}},
 	}, {
 		"bin= -0b101010",
-		map[string]map[string]interface{}{"default": map[string]interface{}{"bin": -42}},
+		map[string]map[string]int{"default": map[string]int{"bin": -42}},
 	}, {
 		"decimal= +685_230",
 		map[string]map[string]int{"default": map[string]int{"decimal": 685230}},
@@ -307,13 +306,13 @@ var unmarshalTests = []struct {
 		map[string]map[string]map[int]map[int]string{"default": map[string]map[int]map[int]string{"hello": map[int]map[int]string{1: map[int]string{2: "world"}}}},
 	}, {
 		"[default]\nhello.1= world\n[section:default]\nhello.1.2= world",
-		map[string]map[string]map[int]interface{}{"default": map[string]map[int]interface{}{"hello": map[int]interface{}{1: "world"}}, "section": map[string]map[int]interface{}{"hello": map[int]interface{}{1: map[interface{}]interface{}{2: "world"}}}},
+		map[string]map[string]map[int]interface{}{"default": map[string]map[int]interface{}{"hello": map[int]interface{}{1: "world"}}, "section": map[string]map[int]interface{}{"hello": map[int]interface{}{1: map[interface{}]interface{}{"2": "world"}}}},
 	}, {
 		"[default]\nhello.1.2= world\n[section:default]\nhello.1= world",
-		map[string]map[string]map[int]interface{}{"default": map[string]map[int]interface{}{"hello": map[int]interface{}{1: map[interface{}]interface{}{2: "world"}}}, "section": map[string]map[int]interface{}{"hello": map[int]interface{}{1: "world"}}},
+		map[string]map[string]map[int]interface{}{"default": map[string]map[int]interface{}{"hello": map[int]interface{}{1: map[interface{}]interface{}{"2": "world"}}}, "section": map[string]map[int]interface{}{"hello": map[int]interface{}{1: "world"}}},
 	}, {
 		"[default]\nhello.1.2= world\nHello=1\n[section:default]\nhello.1= world",
-		map[string]map[string]interface{}{"default": map[string]interface{}{"Hello": 1, "hello": map[interface{}]interface{}{1: map[interface{}]interface{}{2: "world"}}}, "section": map[string]interface{}{"hello": map[interface{}]interface{}{1: "world"}}},
+		map[string]map[string]interface{}{"default": map[string]interface{}{"Hello": "1", "hello": map[interface{}]interface{}{"1": map[interface{}]interface{}{"2": "world"}}}, "section": map[string]interface{}{"hello": map[interface{}]interface{}{"1": "world"}}},
 	}, {
 		"hello= world",
 		&struct {
@@ -389,10 +388,10 @@ func (s *S) TestUnmarshal(c *C) {
 			c.Fatalf("missing case for %s", typ)
 		}
 		err := ini.Unmarshal([]byte(item.data), value)
-		fmt.Println("---")
-		fmt.Println(item.data)
-		fmt.Println(value)
-		fmt.Println("===")
+		//fmt.Println("---")
+		//fmt.Println(item.data)
+		//fmt.Println(value)
+		//fmt.Println("===")
 		if _, ok := err.(*ini.TypeError); !ok {
 			c.Assert(err, IsNil)
 		}
@@ -407,9 +406,9 @@ func (s *S) TestUnmarshal(c *C) {
 func (s *S) TestUnmarshalNaN(c *C) {
 	var value map[string]map[string]interface{}
 	err := ini.Unmarshal([]byte("notanum= .NaN"), &value)
-    fmt.Println("---")
-    fmt.Println(value)
-    fmt.Println("===")
+    //fmt.Println("---")
+    //fmt.Println(value)
+    //fmt.Println("===")
 	c.Assert(err, IsNil)
 	c.Assert(math.IsNaN(value["default"]["notanum"].(float64)), Equals, true)
 }
@@ -461,9 +460,9 @@ func (s *S) TestUnmarshalerWholeDocument(c *C) {
 	err := ini.Unmarshal([]byte(unmarshalerTests[0].data), obj)
 	c.Assert(err, IsNil)
 	value, ok := obj.value.(map[interface{}]interface{})
-    fmt.Println("---")
-    fmt.Println(value)
-    fmt.Println("===")
+    //fmt.Println("---")
+    //fmt.Println(value)
+    //fmt.Println("===")
 	c.Assert(ok, Equals, true, Commentf("value: %#v", obj.value))
 	c.Assert(value, DeepEquals, unmarshalerTests[0].value)
 }

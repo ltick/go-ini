@@ -1,15 +1,16 @@
 package ini_test
 
 import (
-	"testing"
-    "tick-config-ini"
+	. "gopkg.in/check.v1"
+
+	"tick-config-ini"
 )
 
-
-func Test_getIni(t *testing.T) {
+func (s *S) TestIni(c *C) {
 	var (
 		iniContext = `;comment one
 #comment two
+[common]
 string = testing
 string_1 = testing_1
 string_1.1 = "testing"
@@ -27,17 +28,22 @@ switcher_3 = ON
 switcher_4 = Y
 switcher_5 = N
 flag = 1
-[dev:common]
+[Dev:common]
 string_1.1 = "testing_dev"
 string_2.2 = "testing_dev"
 CaseInsensitive = true
 `
 	)
-	var iniConf map[string]interface{}
+	var iniConf interface{}
 	err := ini.Unmarshal([]byte(iniContext), &iniConf)
-	if err != nil {
-		t.Fatal(err)
-	}
+	c.Assert(err, IsNil)
+    value, ok := iniConf.(map[interface{}]interface{})
+	c.Assert(ok, Equals, true, Commentf("value: %#v", iniConf))
+    section_value, ok :=  value["common"].(map[interface{}]interface{})
+    c.Assert(ok, Equals, true, Commentf("value: %#v", value["common"]))
+    string_1_value, ok :=  section_value["string_1"].(map[interface{}]interface{})
+    c.Assert(ok, Equals, true, Commentf("value: %#v", section_value["string_1"]))
+    c.Assert(string_1_value["1"], DeepEquals, "testing")
 
 	//buf, err := Marshal(reflect.ValueOf(iniConf))
 	//fmt.Println(buf)

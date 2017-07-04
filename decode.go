@@ -486,18 +486,14 @@ func settableValueOf(i interface{}) reflect.Value {
 func (d *decoder) scalar(n *node, out reflect.Value) (good bool) {
 	var tag string
 	var resolved interface{}
-	if n.tag == "" {
-		tag = ini_STR_TAG
-		resolved = n.value
-	} else {
-		tag, resolved = resolve(n.tag, n.value)
-		if tag == ini_BINARY_TAG {
-			data, err := base64.StdEncoding.DecodeString(resolved.(string))
-			if err != nil {
-				failf("!!binary value contains invalid base64 data")
-			}
-			resolved = string(data)
+
+	tag, resolved = resolve(n.tag, n.value)
+	if tag == ini_BINARY_TAG {
+		data, err := base64.StdEncoding.DecodeString(resolved.(string))
+		if err != nil {
+			failf("!!binary value contains invalid base64 data")
 		}
+		resolved = string(data)
 	}
 	if resolved == nil {
 		if out.Kind() == reflect.Map && !out.CanAddr() {
@@ -529,7 +525,25 @@ func (d *decoder) scalar(n *node, out reflect.Value) (good bool) {
 		if resolved == nil {
 			out.Set(reflect.Zero(out.Type()))
 		} else {
-			out.Set(reflect.ValueOf(resolved))
+			switch resolved.(type) {
+			case bool:
+                var resolvedString string = strconv.FormatBool(resolved.(bool))
+				out.Set(reflect.ValueOf(resolvedString))
+            case string:
+                var resolvedString string = resolved.(string)
+                out.Set(reflect.ValueOf(resolvedString))
+            case int:
+                var resolvedString string = strconv.FormatInt(int64(resolved.(int)), 10)
+                out.Set(reflect.ValueOf(resolvedString))
+            case int64:
+                var resolvedString string = strconv.FormatInt(resolved.(int64), 10)
+                out.Set(reflect.ValueOf(resolvedString))
+            case uint64:
+                var resolvedString string = strconv.FormatUint(resolved.(uint64), 10)
+                out.Set(reflect.ValueOf(resolvedString))
+			default:
+				out.Set(reflect.ValueOf(resolved))
+			}
 		}
 		good = true
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:

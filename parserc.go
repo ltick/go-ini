@@ -226,13 +226,11 @@ func ini_parser_parse_section_node(parser *ini_parser_t, event *ini_event_t) boo
 		if token.typ == ini_SCALAR_TOKEN {
 			skip_token(parser)
 			parser.state = ini_PARSE_SECTION_NODE_STATE
-			tag := analyzeTag(string(token.value))
 			*event = ini_event_t{
 				typ:        ini_SCALAR_EVENT,
 				start_mark: token.start_mark,
 				end_mark:   token.end_mark,
 				value:      token.value,
-				tag:        []byte(tag),
 				style:      ini_style_t(token.style),
 			}
 			return true
@@ -257,13 +255,11 @@ func ini_parser_parse_section_node(parser *ini_parser_t, event *ini_event_t) boo
 		if token.typ == ini_SCALAR_TOKEN {
 			skip_token(parser)
 			parser.state = ini_PARSE_SECTION_NODE_STATE
-			tag := analyzeTag(string(token.value))
 			*event = ini_event_t{
 				typ:        ini_SCALAR_EVENT,
 				start_mark: token.start_mark,
 				end_mark:   token.end_mark,
 				value:      token.value,
-				tag:        []byte(tag),
 				style:      ini_style_t(token.style),
 			}
 			return true
