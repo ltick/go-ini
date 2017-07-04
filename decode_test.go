@@ -6,8 +6,8 @@ import (
 	"math"
 	"reflect"
 
+	"fmt"
 	"tick-config-ini"
-    "fmt"
 )
 
 var failingErr = errors.New("failingErr")
@@ -300,12 +300,12 @@ var unmarshalTests = []struct {
 		"[default]\nhello.1.2= world",
 		map[string]map[string]map[int]map[int]string{"default": map[string]map[int]map[int]string{"hello": map[int]map[int]string{1: map[int]string{2: "world"}}}},
 	}, {
-        "[default]\nhello= world\nhello.1= world_1",
-        map[string]map[string]map[int]string{"default": map[string]map[int]string{"hello": map[int]string{1: "world_1"}}},
-    }, {
-        "[default]\nhello.1= world\nhello.1.2= world",
-        map[string]map[string]map[int]map[int]string{"default": map[string]map[int]map[int]string{"hello": map[int]map[int]string{1: map[int]string{2: "world"}}}},
-    }, {
+		"[default]\nhello= world\nhello.1= world_1",
+		map[string]map[string]map[int]string{"default": map[string]map[int]string{"hello": map[int]string{1: "world_1"}}},
+	}, {
+		"[default]\nhello.1= world\nhello.1.2= world",
+		map[string]map[string]map[int]map[int]string{"default": map[string]map[int]map[int]string{"hello": map[int]map[int]string{1: map[int]string{2: "world"}}}},
+	}, {
 		"[default]\nhello.1= world\n[section:default]\nhello.1.2= world",
 		map[string]map[string]map[int]interface{}{"default": map[string]map[int]interface{}{"hello": map[int]interface{}{1: "world"}}, "section": map[string]map[int]interface{}{"hello": map[int]interface{}{1: map[interface{}]interface{}{2: "world"}}}},
 	}, {
@@ -313,7 +313,7 @@ var unmarshalTests = []struct {
 		map[string]map[string]map[int]interface{}{"default": map[string]map[int]interface{}{"hello": map[int]interface{}{1: map[interface{}]interface{}{2: "world"}}}, "section": map[string]map[int]interface{}{"hello": map[int]interface{}{1: "world"}}},
 	}, {
 		"[default]\nhello.1.2= world\nHello=1\n[section:default]\nhello.1= world",
-		map[string]map[string]interface{}{"default": map[string]interface{}{"Hello": 1, "hello": map[interface {}]interface{}{1: map[interface {}]interface{}{2: "world"}}}, "section": map[string]interface{}{"hello": map[interface {}]interface{}{1: "world"}}},
+		map[string]map[string]interface{}{"default": map[string]interface{}{"Hello": 1, "hello": map[interface{}]interface{}{1: map[interface{}]interface{}{2: "world"}}}, "section": map[string]interface{}{"hello": map[interface{}]interface{}{1: "world"}}},
 	}, {
 		"hello= world",
 		&struct {
@@ -389,10 +389,10 @@ func (s *S) TestUnmarshal(c *C) {
 			c.Fatalf("missing case for %s", typ)
 		}
 		err := ini.Unmarshal([]byte(item.data), value)
-        fmt.Println("---")
-        fmt.Println(item.data)
-        fmt.Println(value)
-        fmt.Println("===")
+		fmt.Println("---")
+		fmt.Println(item.data)
+		fmt.Println(value)
+		fmt.Println("===")
 		if _, ok := err.(*ini.TypeError); !ok {
 			c.Assert(err, IsNil)
 		}
@@ -404,10 +404,12 @@ func (s *S) TestUnmarshal(c *C) {
 	}
 }
 
-func (s *S)  TestUnmarshalNaN(c *C) {
+func (s *S) TestUnmarshalNaN(c *C) {
 	var value map[string]map[string]interface{}
 	err := ini.Unmarshal([]byte("notanum= .NaN"), &value)
-
+    fmt.Println("---")
+    fmt.Println(value)
+    fmt.Println("===")
 	c.Assert(err, IsNil)
 	c.Assert(math.IsNaN(value["default"]["notanum"].(float64)), Equals, true)
 }
@@ -421,11 +423,47 @@ var unmarshalErrorTests = []struct {
 	},
 }
 
-
 func (s *S) TestUnmarshalErrors(c *C) {
 	for _, item := range unmarshalErrorTests {
 		var value interface{}
 		err := ini.Unmarshal([]byte(item.data), &value)
 		c.Assert(err, ErrorMatches, item.error, Commentf("Partial unmarshal: %#v", value))
 	}
+}
+
+var unmarshalerTests = []struct {
+	data string
+	value     interface{}
+}{
+	{"hi=there", map[interface{}]interface{}{"default": map[interface{}]interface{}{"hi": "there"}}},
+}
+
+var unmarshalerResult = map[int]error{}
+
+type unmarshalerType struct {
+    value interface{}
+}
+
+func (o *unmarshalerType) UnmarshalINI(unmarshal func(v interface{}) error) error {
+    if err := unmarshal(&o.value); err != nil {
+        return err
+    }
+    if i, ok := o.value.(int); ok {
+        if result, ok := unmarshalerResult[i]; ok {
+            return result
+        }
+    }
+    return nil
+}
+
+func (s *S) TestUnmarshalerWholeDocument(c *C) {
+	obj := &unmarshalerType{}
+	err := ini.Unmarshal([]byte(unmarshalerTests[0].data), obj)
+	c.Assert(err, IsNil)
+	value, ok := obj.value.(map[interface{}]interface{})
+    fmt.Println("---")
+    fmt.Println(value)
+    fmt.Println("===")
+	c.Assert(ok, Equals, true, Commentf("value: %#v", obj.value))
+	c.Assert(value, DeepEquals, unmarshalerTests[0].value)
 }

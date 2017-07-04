@@ -201,17 +201,17 @@ func (p *parser) section() *node {
 			// discard different type of node
 			swapChildNodes := make([]*node, 0)
 			for i := 0; i < len(parentNode.children); i += 2 {
-				if parentNode.children[i].value == currentNode.value{
+				if parentNode.children[i].value == currentNode.value {
 					if parentNode.children[i+1].kind == nextNode.kind {
-						swapChildNodes = append(swapChildNodes, parentNode.children[i], parentNode.children[i + 1])
+						swapChildNodes = append(swapChildNodes, parentNode.children[i], parentNode.children[i+1])
 					}
 				} else {
-					swapChildNodes = append(swapChildNodes, parentNode.children[i], parentNode.children[i + 1])
+					swapChildNodes = append(swapChildNodes, parentNode.children[i], parentNode.children[i+1])
 				}
 			}
 			parentNode.children = swapChildNodes
 
-            nodeExist := false
+			nodeExist := false
 			for i := 0; i < len(parentNode.children); i += 2 {
 				// condition:
 				// 1. current node type
@@ -222,7 +222,7 @@ func (p *parser) section() *node {
 					if len(parentNode.children[i+1].children) > 0 {
 						for _, brotherNode := range parentNode.children[i+1].children {
 							if brotherNode.kind != nextNode.kind {
-								parentNode.children[i + 1] = nextNode
+								parentNode.children[i+1] = nextNode
 							}
 						}
 
@@ -387,15 +387,13 @@ func (d *decoder) prepare(n *node, out reflect.Value) (newout reflect.Value, unm
 }
 
 func (d *decoder) unmarshal(n *node, out reflect.Value) (good bool) {
-	switch n.kind {
-	case documentNode:
-		return d.document(n, out)
-	}
 	out, unmarshaled, good := d.prepare(n, out)
 	if unmarshaled {
 		return good
 	}
 	switch n.kind {
+	case documentNode:
+		good = d.document(n, out)
 	case sectionNode:
 		good = d.mapping(n, out)
 	case mappingNode:
@@ -717,8 +715,7 @@ func (d *decoder) mappingStruct(n *node, out reflect.Value) (good bool) {
 	name := settableValueOf("")
 	l := len(n.children)
 	for i := 0; i < l; i += 2 {
-		ni := n.children[i]
-		if !d.unmarshal(ni, name) {
+		if !d.unmarshal(n.children[i], name) {
 			continue
 		}
 		if info, ok := sinfo.FieldsMap[name.String()]; ok {
