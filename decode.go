@@ -220,12 +220,13 @@ func (p *parser) section() *node {
 					nodeExist = true
 					// if child nodes type is different, overwrite it
 					if len(parentNode.children[i+1].children) > 0 {
-						for _, brotherNode := range parentNode.children[i+1].children {
-							if brotherNode.kind != nextNode.kind {
+						for j := 0; j < len(parentNode.children[i+1].children); j += 2 {
+							if parentNode.children[i+1].children[j+1].kind != nextNode.kind {
 								parentNode.children[i+1] = nextNode
+							} else {
+								parentNode.children[i+1] = p.merge_node(nextNode, parentNode.children[i+1])
 							}
 						}
-
 					}
 					break
 				}
@@ -263,6 +264,8 @@ func (p *parser) mapping() *node {
 				// if node type is different, overwrite it
 				if parentNode.children[i+1].kind != nextNode.kind {
 					parentNode.children[i+1] = nextNode
+				} else {
+					parentNode.children[i+1] = p.merge_node(nextNode, parentNode.children[i+1])
 				}
 				parentNode = parentNode.children[i+1]
 			}
@@ -527,20 +530,20 @@ func (d *decoder) scalar(n *node, out reflect.Value) (good bool) {
 		} else {
 			switch resolved.(type) {
 			case bool:
-                var resolvedString string = strconv.FormatBool(resolved.(bool))
+				var resolvedString string = strconv.FormatBool(resolved.(bool))
 				out.Set(reflect.ValueOf(resolvedString))
-            case string:
-                var resolvedString string = resolved.(string)
-                out.Set(reflect.ValueOf(resolvedString))
-            case int:
-                var resolvedString string = strconv.FormatInt(int64(resolved.(int)), 10)
-                out.Set(reflect.ValueOf(resolvedString))
-            case int64:
-                var resolvedString string = strconv.FormatInt(resolved.(int64), 10)
-                out.Set(reflect.ValueOf(resolvedString))
-            case uint64:
-                var resolvedString string = strconv.FormatUint(resolved.(uint64), 10)
-                out.Set(reflect.ValueOf(resolvedString))
+			case string:
+				var resolvedString string = resolved.(string)
+				out.Set(reflect.ValueOf(resolvedString))
+			case int:
+				var resolvedString string = strconv.FormatInt(int64(resolved.(int)), 10)
+				out.Set(reflect.ValueOf(resolvedString))
+			case int64:
+				var resolvedString string = strconv.FormatInt(resolved.(int64), 10)
+				out.Set(reflect.ValueOf(resolvedString))
+			case uint64:
+				var resolvedString string = strconv.FormatUint(resolved.(uint64), 10)
+				out.Set(reflect.ValueOf(resolvedString))
 			default:
 				out.Set(reflect.ValueOf(resolved))
 			}
