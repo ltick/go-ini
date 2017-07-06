@@ -134,33 +134,36 @@ func (p *parser) clone_node(n *node) *node {
 	return thisNode
 }
 
-func (p *parser) merge_node(targetNode *node, sourceNode *node) *node {
+func (p *parser) merge_node(targetNode *node, sourceNode *node) {
 	if targetNode.kind == sourceNode.kind {
 		targetNodeCount := len(targetNode.children)
 		sourceNodeCount := len(sourceNode.children)
-		for i := 0; i < targetNodeCount; i += 2 {
-			nodeExist := false
-			nodeExistIndex := 0
-			for j := 0; j < sourceNodeCount; j += 2 {
-				if targetNode.children[i].kind == scalarNode && sourceNode.children[j].kind == scalarNode {
-					if targetNode.children[i].value == sourceNode.children[j].value {
-						nodeExist = true
-						nodeExistIndex = j
-						if len(targetNode.children[i+1].children) > 0 && len(sourceNode.children[j+1].children) > 0 {
-							if targetNode.children[i+1].children[1].kind == sourceNode.children[j+1].children[1].kind {
-								targetNode.children[i+1] = p.merge_node(targetNode.children[i+1], sourceNode.children[j+1])
-							}
-						}
-						break
-					}
-				}
+        swapChildNodes := make([]*node, 0)
+        for i := 0; i < sourceNodeCount; i += 2 {
+            nodeExist := false
+		    for j := 0; j < targetNodeCount; j += 2 {
+				if sourceNode.children[i].kind == scalarNode  && targetNode.children[j].kind == scalarNode && sourceNode.children[i].value == targetNode.children[j].value {
+                    nodeExist = true
+                    if sourceNode.children[i+1].kind == targetNode.children[j+1].kind {
+                        if len(sourceNode.children[i+1].children) > 0 && len(targetNode.children[j+1].children) > 0 {
+                            p.merge_node(targetNode.children[j+1], p.clone_node(sourceNode.children[i+1]))
+                        }
+                    } else {
+                        // discard different type of node
+                    }
+                    break;
+                }
 			}
-			if !nodeExist {
-				targetNode.children = append(targetNode.children, sourceNode.children[nodeExistIndex], p.clone_node(sourceNode.children[nodeExistIndex+1]))
-			}
+            if !nodeExist {
+                swapChildNodes = append(swapChildNodes, sourceNode.children[i], sourceNode.children[i + 1])
+            }
 		}
+        swapChildNodeCount := len(swapChildNodes)
+        for i := 0; i < swapChildNodeCount; i += 2 {
+            targetNode.children = append(targetNode.children, swapChildNodes[i], swapChildNodes[i + 1])
+        }
 	}
-	return targetNode
+	return
 }
 
 func (p *parser) document() *node {
@@ -175,7 +178,7 @@ func (p *parser) document() *node {
 			// inherit
 			for i := 0; i < len(p.doc.children); i += 2 {
 				if p.doc.children[i].kind == scalarNode && p.doc.children[i].value == nextNode.value {
-					childNode = p.merge_node(childNode, p.doc.children[i+1])
+					p.merge_node(childNode, p.clone_node(p.doc.children[i+1]))
 					break
 				}
 			}
@@ -224,7 +227,7 @@ func (p *parser) section() *node {
 							if parentNode.children[i+1].children[j+1].kind != nextNode.kind {
 								parentNode.children[i+1] = nextNode
 							} else {
-								parentNode.children[i+1] = p.merge_node(nextNode, parentNode.children[i+1])
+								p.merge_node(parentNode.children[i+1], p.clone_node(nextNode))
 							}
 						}
 					}
@@ -265,7 +268,7 @@ func (p *parser) mapping() *node {
 				if parentNode.children[i+1].kind != nextNode.kind {
 					parentNode.children[i+1] = nextNode
 				} else {
-					parentNode.children[i+1] = p.merge_node(nextNode, parentNode.children[i+1])
+                    p.merge_node(parentNode.children[i+1], p.clone_node(nextNode))
 				}
 				parentNode = parentNode.children[i+1]
 			}

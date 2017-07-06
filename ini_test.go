@@ -51,6 +51,12 @@ CaseInsensitive = true
     c.Assert(string_3_1_value["1"], DeepEquals, "testing_1")
 	c.Assert(string_3_1_value["2"], DeepEquals, "testing_2")
 
+	section_value, ok =  value["Dev"].(map[interface{}]interface{})
+	c.Assert(ok, Equals, true, Commentf("value: %#v", value["Dev"]))
+	string_1_value, ok =  section_value["string_1"].(map[interface{}]interface{})
+	c.Assert(ok, Equals, true, Commentf("value: %#v", section_value["string_1"]))
+	c.Assert(string_1_value["1"], DeepEquals, "testing_dev")
+
 	//buf, err := Marshal(reflect.ValueOf(iniConf))
 	//fmt.Println(buf)
 }
