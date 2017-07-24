@@ -138,30 +138,30 @@ func (p *parser) merge_node(targetNode *node, sourceNode *node) {
 	if targetNode.kind == sourceNode.kind {
 		targetNodeCount := len(targetNode.children)
 		sourceNodeCount := len(sourceNode.children)
-        swapChildNodes := make([]*node, 0)
-        for i := 0; i < sourceNodeCount; i += 2 {
-            nodeExist := false
-		    for j := 0; j < targetNodeCount; j += 2 {
-				if sourceNode.children[i].kind == scalarNode  && targetNode.children[j].kind == scalarNode && sourceNode.children[i].value == targetNode.children[j].value {
-                    nodeExist = true
-                    if sourceNode.children[i+1].kind == targetNode.children[j+1].kind {
-                        if len(sourceNode.children[i+1].children) > 0 && len(targetNode.children[j+1].children) > 0 {
-                            p.merge_node(targetNode.children[j+1], p.clone_node(sourceNode.children[i+1]))
-                        }
-                    } else {
-                        // discard different type of node
-                    }
-                    break;
-                }
+		swapChildNodes := make([]*node, 0)
+		for i := 0; i < sourceNodeCount; i += 2 {
+			nodeExist := false
+			for j := 0; j < targetNodeCount; j += 2 {
+				if sourceNode.children[i].kind == scalarNode && targetNode.children[j].kind == scalarNode && sourceNode.children[i].value == targetNode.children[j].value {
+					nodeExist = true
+					if sourceNode.children[i+1].kind == targetNode.children[j+1].kind {
+						if len(sourceNode.children[i+1].children) > 0 && len(targetNode.children[j+1].children) > 0 {
+							p.merge_node(targetNode.children[j+1], p.clone_node(sourceNode.children[i+1]))
+						}
+					} else {
+						// discard different type of node
+					}
+					break
+				}
 			}
-            if !nodeExist {
-                swapChildNodes = append(swapChildNodes, sourceNode.children[i], sourceNode.children[i + 1])
-            }
+			if !nodeExist {
+				swapChildNodes = append(swapChildNodes, sourceNode.children[i], sourceNode.children[i+1])
+			}
 		}
-        swapChildNodeCount := len(swapChildNodes)
-        for i := 0; i < swapChildNodeCount; i += 2 {
-            targetNode.children = append(targetNode.children, swapChildNodes[i], swapChildNodes[i + 1])
-        }
+		swapChildNodeCount := len(swapChildNodes)
+		for i := 0; i < swapChildNodeCount; i += 2 {
+			targetNode.children = append(targetNode.children, swapChildNodes[i], swapChildNodes[i+1])
+		}
 	}
 	return
 }
@@ -176,12 +176,17 @@ func (p *parser) document() *node {
 		if nextNode.kind == inheritNode {
 			childNode := p.parse()
 			// inherit
+            sectionExists := false
 			for i := 0; i < len(p.doc.children); i += 2 {
 				if p.doc.children[i].kind == scalarNode && p.doc.children[i].value == nextNode.value {
+                    sectionExists = true
 					p.merge_node(childNode, p.clone_node(p.doc.children[i+1]))
 					break
 				}
 			}
+            if !sectionExists && nextNode.value != DEFAULT_SECTION {
+                failf("inherit section '%s' does not exists", nextNode.value)
+            }
 			n.children = append(n.children, keyNode, childNode)
 		} else if nextNode.kind == sectionNode {
 			n.children = append(n.children, keyNode, nextNode)
@@ -268,7 +273,7 @@ func (p *parser) mapping() *node {
 				if parentNode.children[i+1].kind != nextNode.kind {
 					parentNode.children[i+1] = nextNode
 				} else {
-                    p.merge_node(parentNode.children[i+1], p.clone_node(nextNode))
+					p.merge_node(parentNode.children[i+1], p.clone_node(nextNode))
 				}
 				parentNode = parentNode.children[i+1]
 			}
@@ -417,11 +422,88 @@ func (d *decoder) document(n *node, out reflect.Value) (good bool) {
 		d.doc = n
 		switch out.Kind() {
 		case reflect.Struct:
-			return d.mappingStruct(n, out)
+			sinfo, err := getStructInfo(out.Type())
+			if err != nil {
+				panic(err)
+			}
+			k := settableValueOf("")
+			l := len(n.children)
+			for i := 0; i < l; i += 2 {
+				if !d.unmarshal(n.children[i], k) {
+					continue
+				}
+                if n.children[i].value == DEFAULT_SECTION {
+                    ll := len(n.children[i+1].children)
+                    for j := 0; j < ll; j += 2 {
+                        if !d.unmarshal(n.children[i + 1].children[j], k) {
+                            continue
+                        }
+                        if info, ok := sinfo.FieldsMap[k.String()]; ok {
+                            var field reflect.Value
+                            if info.Inline == nil {
+                                field = out.Field(info.Num)
+                            } else {
+                                field = out.FieldByIndex(info.Inline)
+                            }
+                            d.unmarshal(n.children[i + 1].children[j + 1], field)
+                        }
+                    }
+                } else {
+                    if info, ok := sinfo.FieldsMap[k.String()]; ok {
+                        var field reflect.Value
+                        if info.Inline == nil {
+                            field = out.Field(info.Num)
+                        } else {
+                            field = out.FieldByIndex(info.Inline)
+                        }
+                        d.unmarshal(n.children[i + 1], field)
+                    }
+                }
+			}
+            return true
 		case reflect.Slice:
-			return d.mappingSlice(n, out)
+			outt := out.Type()
+			if outt.Elem() != mapItemType {
+				d.terror(n, ini_MAP_TAG, out)
+				return false
+			}
+
+			mapType := d.mapType
+			d.mapType = outt
+
+			var slice []MapItem
+			var l = len(n.children)
+			for i := 0; i < l; i += 2 {
+				item := MapItem{}
+				k := reflect.ValueOf(&item.Key).Elem()
+				if !d.unmarshal(n.children[i], k) {
+					continue
+				}
+				if n.children[i].value == DEFAULT_SECTION {
+					ll := len(n.children[i+1].children)
+					for j := 0; j < ll; j += 2 {
+						item := MapItem{}
+						k := reflect.ValueOf(&item.Key).Elem()
+						if !d.unmarshal(n.children[j], k) {
+							continue
+						}
+						v := reflect.ValueOf(&item.Value).Elem()
+						if d.unmarshal(n.children[i+1], v) {
+							slice = append(slice, item)
+						}
+					}
+				} else {
+					v := reflect.ValueOf(&item.Value).Elem()
+					if d.unmarshal(n.children[i+1], v) {
+						slice = append(slice, item)
+					}
+				}
+			}
+			out.Set(reflect.ValueOf(slice))
+			d.mapType = mapType
+			return true
 		case reflect.Map:
-		// okay
+        //okay
 		case reflect.Interface:
 			if d.mapType.Kind() == reflect.Map {
 				iface := out
@@ -454,15 +536,20 @@ func (d *decoder) document(n *node, out reflect.Value) (good bool) {
 		l := len(n.children)
 		for i := 0; i < l; i += 2 {
 			k := reflect.New(kt).Elem()
-			if d.unmarshal(n.children[i], k) {
-				kkind := k.Kind()
-				if kkind == reflect.Interface {
-					kkind = k.Elem().Kind()
-				}
-				if kkind == reflect.Map || kkind == reflect.Slice {
-					failf("invalid map key: %#v", k.Interface())
-				}
-				e := reflect.New(et).Elem()
+			if !d.unmarshal(n.children[i], k) {
+				continue
+			}
+			kkind := k.Kind()
+			if kkind == reflect.Interface {
+				kkind = k.Elem().Kind()
+			}
+			if kkind == reflect.Map || kkind == reflect.Slice {
+				failf("invalid map key: %#v", k.Interface())
+			}
+			e := reflect.New(et).Elem()
+			if n.children[i].value == DEFAULT_SECTION {
+				d.unmarshal(n.children[i+1], out)
+			} else {
 				if d.unmarshal(n.children[i+1], e) {
 					out.SetMapIndex(k, e)
 				}
@@ -487,159 +574,6 @@ func settableValueOf(i interface{}) reflect.Value {
 	sv := reflect.New(v.Type()).Elem()
 	sv.Set(v)
 	return sv
-}
-
-func (d *decoder) scalar(n *node, out reflect.Value) (good bool) {
-	var tag string
-	var resolved interface{}
-
-	tag, resolved = resolve(n.tag, n.value)
-	if tag == ini_BINARY_TAG {
-		data, err := base64.StdEncoding.DecodeString(resolved.(string))
-		if err != nil {
-			failf("!!binary value contains invalid base64 data")
-		}
-		resolved = string(data)
-	}
-	if resolved == nil {
-		if out.Kind() == reflect.Map && !out.CanAddr() {
-			resetMap(out)
-		} else {
-			out.Set(reflect.Zero(out.Type()))
-		}
-		return true
-	}
-	if s, ok := resolved.(string); ok && out.CanAddr() {
-		if u, ok := out.Addr().Interface().(encoding.TextUnmarshaler); ok {
-			err := u.UnmarshalText([]byte(s))
-			if err != nil {
-				fail(err)
-			}
-			return true
-		}
-	}
-	switch out.Kind() {
-	case reflect.String:
-		if tag == ini_BINARY_TAG {
-			out.SetString(resolved.(string))
-			good = true
-		} else if resolved != nil {
-			out.SetString(n.value)
-			good = true
-		}
-	case reflect.Interface:
-		if resolved == nil {
-			out.Set(reflect.Zero(out.Type()))
-		} else {
-			switch resolved.(type) {
-			case bool:
-				var resolvedString string = strconv.FormatBool(resolved.(bool))
-				out.Set(reflect.ValueOf(resolvedString))
-			case string:
-				var resolvedString string = resolved.(string)
-				out.Set(reflect.ValueOf(resolvedString))
-			case int:
-				var resolvedString string = strconv.FormatInt(int64(resolved.(int)), 10)
-				out.Set(reflect.ValueOf(resolvedString))
-			case int64:
-				var resolvedString string = strconv.FormatInt(resolved.(int64), 10)
-				out.Set(reflect.ValueOf(resolvedString))
-			case uint64:
-				var resolvedString string = strconv.FormatUint(resolved.(uint64), 10)
-				out.Set(reflect.ValueOf(resolvedString))
-			default:
-				out.Set(reflect.ValueOf(resolved))
-			}
-		}
-		good = true
-	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		switch resolved := resolved.(type) {
-		case int:
-			if !out.OverflowInt(int64(resolved)) {
-				out.SetInt(int64(resolved))
-				good = true
-			}
-		case int64:
-			if !out.OverflowInt(resolved) {
-				out.SetInt(resolved)
-				good = true
-			}
-		case uint64:
-			if resolved <= math.MaxInt64 && !out.OverflowInt(int64(resolved)) {
-				out.SetInt(int64(resolved))
-				good = true
-			}
-		case float64:
-			if resolved <= math.MaxInt64 && !out.OverflowInt(int64(resolved)) {
-				out.SetInt(int64(resolved))
-				good = true
-			}
-		case string:
-			if out.Type() == durationType {
-				d, err := time.ParseDuration(resolved)
-				if err == nil {
-					out.SetInt(int64(d))
-					good = true
-				}
-			}
-		}
-	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
-		switch resolved := resolved.(type) {
-		case int:
-			if resolved >= 0 && !out.OverflowUint(uint64(resolved)) {
-				out.SetUint(uint64(resolved))
-				good = true
-			}
-		case int64:
-			if resolved >= 0 && !out.OverflowUint(uint64(resolved)) {
-				out.SetUint(uint64(resolved))
-				good = true
-			}
-		case uint64:
-			if !out.OverflowUint(uint64(resolved)) {
-				out.SetUint(uint64(resolved))
-				good = true
-			}
-		case float64:
-			if resolved <= math.MaxUint64 && !out.OverflowUint(uint64(resolved)) {
-				out.SetUint(uint64(resolved))
-				good = true
-			}
-		}
-	case reflect.Bool:
-		switch resolved := resolved.(type) {
-		case bool:
-			out.SetBool(resolved)
-			good = true
-		}
-	case reflect.Float32, reflect.Float64:
-		switch resolved := resolved.(type) {
-		case int:
-			out.SetFloat(float64(resolved))
-			good = true
-		case int64:
-			out.SetFloat(float64(resolved))
-			good = true
-		case uint64:
-			out.SetFloat(float64(resolved))
-			good = true
-		case float64:
-			out.SetFloat(resolved)
-			good = true
-		}
-	case reflect.Ptr:
-		if out.Type().Elem() == reflect.TypeOf(resolved) {
-			// TODO DOes this make sense? When is out a Ptr except when decoding a nil value?
-			elem := reflect.New(out.Type().Elem())
-			elem.Elem().Set(reflect.ValueOf(resolved))
-			out.Set(elem)
-			good = true
-		}
-	}
-	if !good {
-		d.terror(n, tag, out)
-	}
-	return good
 }
 
 func (d *decoder) mapping(n *node, out reflect.Value) (good bool) {
@@ -749,4 +683,158 @@ func (d *decoder) mappingStruct(n *node, out reflect.Value) (good bool) {
 		}
 	}
 	return true
+}
+
+func (d *decoder) scalar(n *node, out reflect.Value) (good bool) {
+	var tag string
+	var resolved interface{}
+
+	tag, resolved = resolve(n.tag, n.value)
+	if tag == ini_BINARY_TAG {
+		data, err := base64.StdEncoding.DecodeString(resolved.(string))
+		if err != nil {
+			failf("!!binary value contains invalid base64 data")
+		}
+		resolved = string(data)
+	}
+	if resolved == nil {
+		if out.Kind() == reflect.Map && !out.CanAddr() {
+			resetMap(out)
+		} else {
+			out.Set(reflect.Zero(out.Type()))
+		}
+		return true
+	}
+	if s, ok := resolved.(string); ok && out.CanAddr() {
+		if u, ok := out.Addr().Interface().(encoding.TextUnmarshaler); ok {
+			err := u.UnmarshalText([]byte(s))
+			if err != nil {
+				fail(err)
+			}
+			return true
+		}
+	}
+	switch out.Kind() {
+	case reflect.String:
+		if tag == ini_BINARY_TAG {
+			out.SetString(resolved.(string))
+			good = true
+		} else if resolved != nil {
+			out.SetString(n.value)
+			good = true
+		}
+	case reflect.Interface:
+		if resolved == nil {
+			out.Set(reflect.Zero(out.Type()))
+		} else {
+			// TODO Not sure if we should resolve interface type of scalar
+			switch resolved.(type) {
+			//case bool:
+			//	var resolvedString string = strconv.FormatBool(resolved.(bool))
+			//	out.Set(reflect.ValueOf(resolvedString))
+			//case string:
+			//	var resolvedString string = resolved.(string)
+			//	out.Set(reflect.ValueOf(resolvedString))
+			//case int:
+			//	var resolvedString string = strconv.FormatInt(int64(resolved.(int)), 10)
+			//	out.Set(reflect.ValueOf(resolvedString))
+			//case int64:
+			//	var resolvedString string = strconv.FormatInt(resolved.(int64), 10)
+			//	out.Set(reflect.ValueOf(resolvedString))
+			//case uint64:
+			//	var resolvedString string = strconv.FormatUint(resolved.(uint64), 10)
+			//	out.Set(reflect.ValueOf(resolvedString))
+			default:
+				out.Set(reflect.ValueOf(resolved))
+			}
+		}
+		good = true
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		switch resolved := resolved.(type) {
+		case int:
+			if !out.OverflowInt(int64(resolved)) {
+				out.SetInt(int64(resolved))
+				good = true
+			}
+		case int64:
+			if !out.OverflowInt(resolved) {
+				out.SetInt(resolved)
+				good = true
+			}
+		case uint64:
+			if resolved <= math.MaxInt64 && !out.OverflowInt(int64(resolved)) {
+				out.SetInt(int64(resolved))
+				good = true
+			}
+		case float64:
+			if resolved <= math.MaxInt64 && !out.OverflowInt(int64(resolved)) {
+				out.SetInt(int64(resolved))
+				good = true
+			}
+		case string:
+			if out.Type() == durationType {
+				d, err := time.ParseDuration(resolved)
+				if err == nil {
+					out.SetInt(int64(d))
+					good = true
+				}
+			}
+		}
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
+		switch resolved := resolved.(type) {
+		case int:
+			if resolved >= 0 && !out.OverflowUint(uint64(resolved)) {
+				out.SetUint(uint64(resolved))
+				good = true
+			}
+		case int64:
+			if resolved >= 0 && !out.OverflowUint(uint64(resolved)) {
+				out.SetUint(uint64(resolved))
+				good = true
+			}
+		case uint64:
+			if !out.OverflowUint(uint64(resolved)) {
+				out.SetUint(uint64(resolved))
+				good = true
+			}
+		case float64:
+			if resolved <= math.MaxUint64 && !out.OverflowUint(uint64(resolved)) {
+				out.SetUint(uint64(resolved))
+				good = true
+			}
+		}
+	case reflect.Bool:
+		switch resolved := resolved.(type) {
+		case bool:
+			out.SetBool(resolved)
+			good = true
+		}
+	case reflect.Float32, reflect.Float64:
+		switch resolved := resolved.(type) {
+		case int:
+			out.SetFloat(float64(resolved))
+			good = true
+		case int64:
+			out.SetFloat(float64(resolved))
+			good = true
+		case uint64:
+			out.SetFloat(float64(resolved))
+			good = true
+		case float64:
+			out.SetFloat(resolved)
+			good = true
+		}
+	case reflect.Ptr:
+		if out.Type().Elem() == reflect.TypeOf(resolved) {
+			// TODO DOes this make sense? When is out a Ptr except when decoding a nil value?
+			elem := reflect.New(out.Type().Elem())
+			elem.Elem().Set(reflect.ValueOf(resolved))
+			out.Set(elem)
+			good = true
+		}
+	}
+	if !good {
+		d.terror(n, tag, out)
+	}
+	return good
 }

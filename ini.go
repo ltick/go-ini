@@ -1,11 +1,8 @@
 package ini
 
 import (
-	"bufio"
-	"bytes"
 	"errors"
 	"fmt"
-	"io"
 	"reflect"
 	"strings"
 	"sync"
@@ -40,7 +37,6 @@ type Marshaler interface {
 }
 
 var (
-	defaultSection     = "common"    // default section means if some ini items not in a section, make them in default section,
 	bNumComment        = []byte{'#'} // number signal
 	bSemComment        = []byte{';'} // semicolon signal
 	bEmpty             = []byte{}
@@ -53,10 +49,6 @@ var (
 
 	itemType = reflect.TypeOf(map[string]interface{}{})
 )
-
-func GetDefaultSection() string {
-	return defaultSection
-}
 
 func Unmarshal(in []byte, out interface{}) (err error) {
 	defer handleErr(&err)
@@ -228,184 +220,3 @@ func isZero(v reflect.Value) bool {
 	}
 	return false
 }
-
-/*old*/
-
-func unmarshal(content []byte, data reflect.Value, comment reflect.Value) (err error) {
-	var copyData func(src reflect.Value, dst reflect.Value) (err error)
-	copyData = func(src reflect.Value, dst reflect.Value) (err error) {
-		if src.Kind() == reflect.Map {
-			for _, key := range src.MapKeys() {
-				value := src.MapIndex(key)
-				switch value.Kind() {
-				case reflect.Map:
-					subValue := reflect.MakeMap(itemType)
-					err = copyData(value, subValue)
-					if err != nil {
-						dst.SetMapIndex(key, subValue)
-					}
-				default:
-					dst.SetMapIndex(key, value)
-				}
-			}
-		}
-		return nil
-	}
-
-	var addData func(key string, value string, data reflect.Value) (err error)
-	addData = func(key string, value string, data reflect.Value) (err error) {
-		v := data
-		if v.Kind() == reflect.Ptr && !v.IsNil() {
-			v = v.Elem()
-		}
-		keys := strings.Split(key, ".")
-		key = keys[0]
-		if len(keys) == 1 {
-			v.SetMapIndex(reflect.ValueOf(key), reflect.ValueOf(value))
-		} else {
-			subValue := reflect.MakeMap(itemType)
-			tmpValue := v.MapIndex(reflect.ValueOf(key))
-			if tmpValue.IsValid() {
-				if reflect.TypeOf(tmpValue) == itemType {
-					subValue = tmpValue
-				}
-			}
-			err = addData(strings.Join(keys[1:], "."), value, reflect.ValueOf(&subValue))
-			if err != nil {
-				return err
-			}
-		}
-		return nil
-	}
-
-	var commentBuf bytes.Buffer
-	buf := bufio.NewReader(bytes.NewReader(content))
-	section := defaultSection
-	implementSection := ""
-	for {
-		line, _, err := buf.ReadLine()
-		if err == io.EOF {
-			break
-		}
-		if bytes.Equal(line, bEmpty) {
-			continue
-		}
-		line = bytes.TrimSpace(line)
-
-		var bComment []byte
-		switch {
-		case bytes.HasPrefix(line, bNumComment):
-			bComment = bNumComment
-		case bytes.HasPrefix(line, bSemComment):
-			bComment = bSemComment
-		}
-		if bComment != nil {
-			line = bytes.TrimLeft(line, string(bComment))
-			// Need append to a new line if multi-line comments.
-			if commentBuf.Len() > 0 {
-				commentBuf.WriteByte('\n')
-			}
-			commentBuf.Write(line)
-			continue
-		}
-		if bytes.HasPrefix(line, sectionStart) && bytes.HasSuffix(line, sectionEnd) {
-			section = strings.ToLower(string(line[1 : len(line)-1])) // section name case insensitive
-			if seperatorIndex := bytes.Index(line, []byte(implementSeperator)); seperatorIndex != -1 {
-				implementSection = string(line[seperatorIndex+1 : len(line)-1])
-				section = string(line[1:seperatorIndex])
-			}
-			if commentBuf.Len() > 0 {
-				comment.Elem().MapIndex(reflect.ValueOf(section)).SetString(commentBuf.String())
-				commentBuf.Reset()
-			}
-			continue
-		}
-		sectionData := data.MapIndex(reflect.ValueOf(section))
-		// data[section] not exists
-		if !sectionData.IsValid() {
-			data.SetMapIndex(reflect.ValueOf(section), reflect.MakeMap(itemType))
-		}
-		implementSectionData := data.MapIndex(reflect.ValueOf(implementSection))
-		// data[implementSection] exists
-		if implementSectionData.IsValid() {
-			sectionData = reflect.MakeMap(itemType)
-			copyData(sectionData, implementSectionData)
-			data.SetMapIndex(reflect.ValueOf(section), sectionData)
-		}
-
-		keyValue := bytes.SplitN(line, bEqual, 2)
-
-		key := string(bytes.TrimSpace(keyValue[0])) // key name case insensitive
-		key = strings.ToLower(key)
-
-		if len(keyValue) != 2 {
-			return errors.New("read the content error: \"" + string(line) + "\", should key = val")
-		}
-		val := bytes.TrimSpace(keyValue[1])
-		if bytes.HasPrefix(val, bDQuote) {
-			val = bytes.Trim(val, `"`)
-		}
-		err = addData(key, string(val), sectionData.Addr())
-		if err != nil {
-			return err
-		}
-		data.SetMapIndex(reflect.ValueOf(section), sectionData)
-
-		if commentBuf.Len() > 0 {
-			comment.SetMapIndex(reflect.ValueOf(section+"."+key), reflect.ValueOf(commentBuf.String()))
-			commentBuf.Reset()
-		}
-
-		implementSection = ""
-	}
-
-	return nil
-
-}
-
-// Set writes a new value for key.
-// if write to one section, the key need be "section::key".
-/*
-func (c *IniConfig) Set(key string, value string) (err error) {
-	c.Lock()
-	defer c.Unlock()
-
-	if key == "" {
-		return errors.New("key is empty")
-	}
-
-	keys := strings.Split(strings.ToLower(key), "::")
-	section := ""
-	if len(keys) >= 2 {
-		section = keys[0]
-		key = keys[1]
-	} else {
-		section = defaultSection
-		key = keys[0]
-	}
-
-	if _, ok := c.data[section]; !ok {
-		c.data[section] = make(map[string]interface{})
-	}
-	keys = strings.Split(key, ".")
-	key_len := len(keys)
-
-	data := c.data[section]
-	for index, key := range keys[0:] {
-		if index == key_len-1 {
-			data[key] = value
-		} else {
-			if _, ok := data[key]; ok {
-				data, ok = data[key].(map[string]interface{})
-				if !ok {
-					return errors.New("not exist key:" + key)
-				}
-			} else {
-				return errors.New("not exist key:" + key)
-			}
-		}
-	}
-
-	return nil
-}
-*/

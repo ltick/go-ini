@@ -118,7 +118,7 @@ func ini_parser_parse_section_start(parser *ini_parser_t, event *ini_event_t, fi
 				typ:        ini_SCALAR_EVENT,
 				start_mark: token.start_mark,
 				end_mark:   token.start_mark,
-				value:      []byte("default"),
+				value:      []byte(DEFAULT_SECTION),
 				tag:        []byte(ini_STR_TAG),
 			}
 			return true
@@ -158,7 +158,7 @@ func ini_parser_parse_section_inherit(parser *ini_parser_t, event *ini_event_t) 
 	}
 	start_mark := token.start_mark
 	end_mark := token.start_mark
-	section_key := []byte("")
+	section_key := []byte(DEFAULT_SECTION)
 	if token.typ == ini_SECTION_INHERIT_TOKEN {
 		skip_token(parser)
 		token = peek_token(parser)
