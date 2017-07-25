@@ -3,7 +3,7 @@ package ini_test
 import (
 	. "gopkg.in/check.v1"
 
-	"tick-config-ini"
+	"go-ini"
 )
 
 func (s *S) TestIni(c *C) {

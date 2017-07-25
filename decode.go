@@ -15,6 +15,7 @@ const (
 	inheritNode
 	sectionNode
 	mappingNode
+	valueNode
 	scalarNode
 	commentNode
 )
@@ -176,17 +177,17 @@ func (p *parser) document() *node {
 		if nextNode.kind == inheritNode {
 			childNode := p.parse()
 			// inherit
-            sectionExists := false
+			sectionExists := false
 			for i := 0; i < len(p.doc.children); i += 2 {
 				if p.doc.children[i].kind == scalarNode && p.doc.children[i].value == nextNode.value {
-                    sectionExists = true
+					sectionExists = true
 					p.merge_node(childNode, p.clone_node(p.doc.children[i+1]))
 					break
 				}
 			}
-            if !sectionExists && nextNode.value != DEFAULT_SECTION {
-                failf("inherit section '%s' does not exists", nextNode.value)
-            }
+			if !sectionExists && nextNode.value != DEFAULT_SECTION {
+				failf("inherit section '%s' does not exists", nextNode.value)
+			}
 			n.children = append(n.children, keyNode, childNode)
 		} else if nextNode.kind == sectionNode {
 			n.children = append(n.children, keyNode, nextNode)
@@ -204,6 +205,9 @@ func (p *parser) section() *node {
 	parentNode := thisNode
 	for p.event.typ != ini_SECTION_ENTRY_EVENT {
 		currentNode := p.parse()
+		if currentNode == nil {
+			p.fail()
+		}
 		if currentNode.kind == scalarNode {
 			nextNode := p.parse()
 			// discard different type of node
@@ -254,6 +258,9 @@ func (p *parser) mapping() *node {
 	p.skip()
 	parentNode := thisNode
 	currentNode := p.parse()
+	if currentNode == nil {
+		p.fail()
+	}
 	if currentNode.kind == scalarNode {
 		nextNode := p.parse()
 		nodeExist := false
@@ -432,35 +439,35 @@ func (d *decoder) document(n *node, out reflect.Value) (good bool) {
 				if !d.unmarshal(n.children[i], k) {
 					continue
 				}
-                if n.children[i].value == DEFAULT_SECTION {
-                    ll := len(n.children[i+1].children)
-                    for j := 0; j < ll; j += 2 {
-                        if !d.unmarshal(n.children[i + 1].children[j], k) {
-                            continue
-                        }
-                        if info, ok := sinfo.FieldsMap[k.String()]; ok {
-                            var field reflect.Value
-                            if info.Inline == nil {
-                                field = out.Field(info.Num)
-                            } else {
-                                field = out.FieldByIndex(info.Inline)
-                            }
-                            d.unmarshal(n.children[i + 1].children[j + 1], field)
-                        }
-                    }
-                } else {
-                    if info, ok := sinfo.FieldsMap[k.String()]; ok {
-                        var field reflect.Value
-                        if info.Inline == nil {
-                            field = out.Field(info.Num)
-                        } else {
-                            field = out.FieldByIndex(info.Inline)
-                        }
-                        d.unmarshal(n.children[i + 1], field)
-                    }
-                }
+				if n.children[i].value == DEFAULT_SECTION {
+					ll := len(n.children[i+1].children)
+					for j := 0; j < ll; j += 2 {
+						if !d.unmarshal(n.children[i+1].children[j], k) {
+							continue
+						}
+						if info, ok := sinfo.FieldsMap[k.String()]; ok {
+							var field reflect.Value
+							if info.Inline == nil {
+								field = out.Field(info.Num)
+							} else {
+								field = out.FieldByIndex(info.Inline)
+							}
+							d.unmarshal(n.children[i+1].children[j+1], field)
+						}
+					}
+				} else {
+					if info, ok := sinfo.FieldsMap[k.String()]; ok {
+						var field reflect.Value
+						if info.Inline == nil {
+							field = out.Field(info.Num)
+						} else {
+							field = out.FieldByIndex(info.Inline)
+						}
+						d.unmarshal(n.children[i+1], field)
+					}
+				}
 			}
-            return true
+			return true
 		case reflect.Slice:
 			outt := out.Type()
 			if outt.Elem() != mapItemType {
@@ -503,7 +510,7 @@ func (d *decoder) document(n *node, out reflect.Value) (good bool) {
 			d.mapType = mapType
 			return true
 		case reflect.Map:
-        //okay
+			//okay
 		case reflect.Interface:
 			if d.mapType.Kind() == reflect.Map {
 				iface := out

@@ -483,10 +483,10 @@ func ini_parser_fetch_section_entry(parser *ini_parser_t) bool {
 	start_mark := parser.mark
 	skip(parser)
 	end_mark := parser.mark
-	if !is_breakz(parser.buffer, parser.buffer_pos) {
+	if !is_break(parser.buffer, parser.buffer_pos) {
 		return ini_parser_set_scanner_error(parser,
-			"while scanning for the section start", parser.mark,
-			"found character("+string([]byte{parser.buffer[parser.buffer_pos]})+") that cannot end for any section entry")
+			"while scanning for the section entry", parser.mark,
+			"must have a line break before the first section key")
 	}
 	token := ini_token_t{
 		typ:        ini_SECTION_ENTRY_TOKEN,
@@ -501,7 +501,7 @@ func ini_parser_scan_section_key(parser *ini_parser_t, token *ini_token_t) bool 
 	start_mark := parser.mark
 	var s []byte
 	// Consume the content of the plain scalar.
-	for !is_breakz(parser.buffer, parser.buffer_pos) && parser.buffer[parser.buffer_pos] != ':' &&
+	for !is_break(parser.buffer, parser.buffer_pos) && parser.buffer[parser.buffer_pos] != ':' &&
 		parser.buffer[parser.buffer_pos] != '[' && parser.buffer[parser.buffer_pos] != ']' {
 		if !is_alpha(parser.buffer, parser.buffer_pos) {
 			return ini_parser_set_scanner_error(parser,

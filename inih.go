@@ -273,7 +273,8 @@ const (
 	ini_PARSE_SECTION_START_STATE       // Expect SECTION-ENTRY.
 	ini_PARSE_SECTION_INHERIT_STATE 	// Expect SECTION-INHERIT.
 	ini_PARSE_SECTION_ENTRY_STATE       // Expect SECTION-ENTRY.
-    ini_PARSE_SECTION_NODE_STATE   // Expect a MAP.
+	ini_PARSE_SECTION_KEY_STATE   // Expect a KEY.
+    ini_PARSE_SECTION_VALUE_STATE   // Expect a VALUE.
 	ini_PARSE_COMMENT_START_STATE       // Expect COMMENT-START.
 	ini_PARSE_COMMENT_CONTENT_STATE     // Expect the content of a comment.
 	ini_PARSE_COMMENT_END_STATE         // Expect COMMENT-END.
@@ -293,8 +294,10 @@ func (ps ini_parser_state_t) String() string {
 		return "ini_PARSE_SECTION_INHERIT_STATE"
 	case ini_PARSE_SECTION_ENTRY_STATE:
 		return "ini_PARSE_SECTION_ENTRY_STATE"
-	case ini_PARSE_SECTION_NODE_STATE:
-		return "ini_PARSE_SECTION_NODE_STATE"
+	case ini_PARSE_SECTION_KEY_STATE:
+		return "ini_PARSE_SECTION_KEY_STATE"
+	case ini_PARSE_SECTION_VALUE_STATE:
+		return "ini_PARSE_SECTION_VALUE_STATE"
 	case ini_PARSE_COMMENT_START_STATE:
 		return "ini_PARSE_COMMENT_START_STATE"
 	case ini_PARSE_COMMENT_CONTENT_STATE:

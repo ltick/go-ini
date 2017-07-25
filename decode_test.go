@@ -6,7 +6,7 @@ import (
 	"math"
 	"reflect"
 
-	"tick-config-ini"
+	"go-ini"
 )
 
 var failingErr = errors.New("failingErr")
@@ -508,8 +508,12 @@ var unmarshalErrorTests = []struct {
 	data, error string
 }{
 	{
+		"hello: world",
+		"ini: line 1: did not find expected <value> or <map>",
+	},
+	{
 		"[section]'hello'= \"world\"",
-		"ini: found character\\('\\) that cannot end for any section entry",
+		"ini: must have a line break before the first section key",
 	},
     {
         "hello= world\n[section_2:section_1]\nhello_2= world\n[section_1]\nhello_1= world",

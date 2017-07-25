@@ -1,102 +1,95 @@
 package ini_test
 
-import (
-	//"math"
-	"os"
-	"testing"
-	"tick-config-ini"
-)
-
+/*
 var marshalTests = []struct {
-	value interface{}
-	data  string
+value interface{}
+data  string
 }{
-	{
-		nil,
-		"null\n",
-	}, {
-		map[string]string{"v": "hi"},
-		"v: hi\n",
-		/*
-			}, {
-				map[string]interface{}{"v": "hi"},
-				"v: hi\n",
-			}, {
-				map[string]string{"v": "true"},
-				"v: \"true\"\n",
-			}, {
-				map[string]string{"v": "false"},
-				"v: \"false\"\n",
-			}, {
-				map[string]interface{}{"v": true},
-				"v: true\n",
-			}, {
-				map[string]interface{}{"v": false},
-				"v: false\n",
-			}, {
-				map[string]interface{}{"v": 10},
-				"v: 10\n",
-			}, {
-				map[string]interface{}{"v": -10},
-				"v: -10\n",
-			}, {
-				map[string]uint{"v": 42},
-				"v: 42\n",
-			}, {
-				map[string]interface{}{"v": int64(4294967296)},
-				"v: 4294967296\n",
-			}, {
-				map[string]int64{"v": int64(4294967296)},
-				"v: 4294967296\n",
-			}, {
-				map[string]uint64{"v": 4294967296},
-				"v: 4294967296\n",
-			}, {
-				map[string]interface{}{"v": "10"},
-				"v: \"10\"\n",
-			}, {
-				map[string]interface{}{"v": 0.1},
-				"v: 0.1\n",
-			}, {
-				map[string]interface{}{"v": float64(0.1)},
-				"v: 0.1\n",
-			}, {
-				map[string]interface{}{"v": -0.1},
-				"v: -0.1\n",
-			}, {
-				map[string]interface{}{"v": math.Inf(+1)},
-				"v: .inf\n",
-			}, {
-				map[string]interface{}{"v": math.Inf(-1)},
-				"v: -.inf\n",
-			}, {
-				map[string]interface{}{"v": math.NaN()},
-				"v: .nan\n",
-			}, {
-				map[string]interface{}{"v": nil},
-				"v: null\n",
-			}, {
-				map[string]interface{}{"v": ""},
-				"v: \"\"\n",
-			}, {
-				map[string]interface{}{"v": map[string]string{"0": "A", "1": "B"}},
-				"v.0:A\nv.1:B\n",
-			}, {
-				map[string]interface{}{"v": map[string]interface{}{"0": "A", "1": map[string]string{"1": "B"}}},
-				"v.0:A\nv.1.1:B\n",
-			}, {
-				map[string]interface{}{"v": map[string]interface{}{"0": "A", "1": map[string]string{"1": "B", "2": "C"}}},
-				"v.0:A\nv.1.1:B\nv.1.2=C\n",
-			}, {
-				map[string]interface{}{"a": "="},
-				"a='='",
-			}, {
-				map[string]interface{}{"a": "[A]"},
-				"a='[A]'",
-			}, {
-				map[string]interface{}{"a": "[A:B]"},
-				"a='[A:B]'",
-		*/
+{
+    nil,
+    "null\n",
+}, {
+    map[string]string{"v": "hi"},
+    "v: hi\n",
+
+        }, {
+            map[string]interface{}{"v": "hi"},
+            "v: hi\n",
+        }, {
+            map[string]string{"v": "true"},
+            "v: \"true\"\n",
+        }, {
+            map[string]string{"v": "false"},
+            "v: \"false\"\n",
+        }, {
+            map[string]interface{}{"v": true},
+            "v: true\n",
+        }, {
+            map[string]interface{}{"v": false},
+            "v: false\n",
+        }, {
+            map[string]interface{}{"v": 10},
+            "v: 10\n",
+        }, {
+            map[string]interface{}{"v": -10},
+            "v: -10\n",
+        }, {
+            map[string]uint{"v": 42},
+            "v: 42\n",
+        }, {
+            map[string]interface{}{"v": int64(4294967296)},
+            "v: 4294967296\n",
+        }, {
+            map[string]int64{"v": int64(4294967296)},
+            "v: 4294967296\n",
+        }, {
+            map[string]uint64{"v": 4294967296},
+            "v: 4294967296\n",
+        }, {
+            map[string]interface{}{"v": "10"},
+            "v: \"10\"\n",
+        }, {
+            map[string]interface{}{"v": 0.1},
+            "v: 0.1\n",
+        }, {
+            map[string]interface{}{"v": float64(0.1)},
+            "v: 0.1\n",
+        }, {
+            map[string]interface{}{"v": -0.1},
+            "v: -0.1\n",
+        }, {
+            map[string]interface{}{"v": math.Inf(+1)},
+            "v: .inf\n",
+        }, {
+            map[string]interface{}{"v": math.Inf(-1)},
+            "v: -.inf\n",
+        }, {
+            map[string]interface{}{"v": math.NaN()},
+            "v: .nan\n",
+        }, {
+            map[string]interface{}{"v": nil},
+            "v: null\n",
+        }, {
+            map[string]interface{}{"v": ""},
+            "v: \"\"\n",
+        }, {
+            map[string]interface{}{"v": map[string]string{"0": "A", "1": "B"}},
+            "v.0:A\nv.1:B\n",
+        }, {
+            map[string]interface{}{"v": map[string]interface{}{"0": "A", "1": map[string]string{"1": "B"}}},
+            "v.0:A\nv.1.1:B\n",
+        }, {
+            map[string]interface{}{"v": map[string]interface{}{"0": "A", "1": map[string]string{"1": "B", "2": "C"}}},
+            "v.0:A\nv.1.1:B\nv.1.2=C\n",
+        }, {
+            map[string]interface{}{"a": "="},
+            "a='='",
+        }, {
+            map[string]interface{}{"a": "[A]"},
+            "a='[A]'",
+        }, {
+            map[string]interface{}{"a": "[A:B]"},
+            "a='[A:B]'",
 	},
 }
 
@@ -154,3 +147,4 @@ func TestMarshalerError(t *testing.T) {
 		t.Error("TestUnmarshal Failed")
 	}
 }
+*/
