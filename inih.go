@@ -204,47 +204,6 @@ const (
     ini_DEFAULT_SCALAR_TAG   = ini_STR_TAG // The default scalar tag is str
 )
 
-type ini_section_type_t int
-
-const (
-	// An empty node.
-	ini_DEFAULT_SECTION ini_section_type_t = iota
-
-	ini_SINGLE_SECTION
-	ini_INHERIT_SECTION
-)
-
-// The node structure.
-type ini_section_t struct {
-	typ ini_section_type_t // The node type.
-
-	value  []byte // The section value.
-	length int    // The length of the section value.
-
-	inherit []byte // The inherit section value.
-
-	// The node data.
-	items []ini_item_t
-
-	start_mark ini_mark_t // The beginning of the node.
-	end_mark   ini_mark_t // The end of the node.
-}
-
-type ini_item_t struct {
-	key   []byte // The key.
-	value []byte // The value.
-}
-
-// The document structure.
-type ini_document_t struct {
-
-	// The document sections.
-	sections []ini_section_t
-
-	// The start/end of the document.
-	start_mark, end_mark ini_mark_t
-}
-
 // The prototype of a read handler.
 //
 // The read handler is called when the parser needs to read more bytes from the

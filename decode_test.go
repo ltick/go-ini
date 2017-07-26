@@ -271,8 +271,39 @@ var unmarshalTests = []struct {
 	}, {
 		"v= 'B'",
 		map[string]interface{}{"v": "B"},
+	}, {
+		"hello.1= world_1",
+		map[string]map[int]interface{}{
+			"hello": map[int]interface{}{
+				1: "world_1",
+			},
+		},
+	}, {
+		"hello.1.2= world_1_2",
+		map[string]map[int]map[int]string{
+			"hello": map[int]map[int]string{
+				1: map[int]string{
+					2: "world_1_2",
+				},
+			},
+		},
+	}, {
+		"hello= world\nhello.1= world_1",
+		map[string]map[int]string{
+			"hello": map[int]string{
+				1: "world_1",
+			},
+		},
+	}, {
+		"hello.1= world\nhello.1.2= world_1_2",
+		map[string]map[int]map[int]string{
+			"hello": map[int]map[int]string{
+				1: map[int]string{
+					2: "world_1_2",
+				},
+			},
+		},
 	},
-
 	// section conversions.
 	{
 		"[section]\n'hello'= \"world\"",
@@ -300,14 +331,14 @@ var unmarshalTests = []struct {
 		map[string]interface{}{
 			"hello": "world",
 			"section_1": map[interface{}]interface{}{
-                "hello":  "world",
+				"hello":   "world",
 				"hello_1": "world",
 			},
-            "section_2": map[interface{}]interface{}{
-                "hello":  "world",
-                "hello_1": "world",
-                "hello_2": "world",
-            },
+			"section_2": map[interface{}]interface{}{
+				"hello":   "world",
+				"hello_1": "world",
+				"hello_2": "world",
+			},
 		},
 	}, {
 		"hello.1= world\n[section]\nhello.2= world",
@@ -318,38 +349,6 @@ var unmarshalTests = []struct {
 			"section": map[interface{}]interface{}{
 				"hello": map[interface{}]interface{}{
 					1: "world",
-					2: "world",
-				},
-			},
-		},
-	}, {
-		"hello.1= world",
-		map[string]map[int]interface{}{
-			"hello": map[int]interface{}{
-				1: "world",
-			},
-		},
-	}, {
-		"hello.1.2= world",
-		map[string]map[int]map[int]string{
-			"hello": map[int]map[int]string{
-				1: map[int]string{
-					2: "world",
-				},
-			},
-		},
-	}, {
-		"hello= world\nhello.1= world_1",
-		map[string]map[int]string{
-			"hello": map[int]string{
-				1: "world_1",
-			},
-		},
-	}, {
-		"hello.1= world\nhello.1.2= world",
-		map[string]map[int]map[int]string{
-			"hello": map[int]map[int]string{
-				1: map[int]string{
 					2: "world",
 				},
 			},
@@ -398,6 +397,23 @@ var unmarshalTests = []struct {
 			},
 		},
 	}, {
+		"hello_1= world\n[section]\nhello_2.1= world\nhello_2.2.1= world_1\nhello_2.2.2= world_2",
+		map[string]interface{}{
+			"hello_1": "world",
+			"section": map[interface{}]interface{}{
+				"hello_1": "world",
+				"hello_2": map[interface{}]interface{}{
+					1: "world",
+					2: map[interface{}]interface{}{
+						1: "world_1",
+						2: "world_2",
+					},
+				},
+			},
+		},
+	},
+	// struct conversions
+	{
 		"hello= world",
 		&struct {
 			Hello string
@@ -515,10 +531,10 @@ var unmarshalErrorTests = []struct {
 		"[section]'hello'= \"world\"",
 		"ini: must have a line break before the first section key",
 	},
-    {
-        "hello= world\n[section_2:section_1]\nhello_2= world\n[section_1]\nhello_1= world",
-        "ini: inherit section 'section_1' does not exists",
-    },
+	{
+		"hello= world\n[section_2:section_1]\nhello_2= world\n[section_1]\nhello_1= world",
+		"ini: inherit section 'section_1' does not exists",
+	},
 }
 
 func (s *S) TestUnmarshalErrors(c *C) {

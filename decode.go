@@ -15,7 +15,6 @@ const (
 	inheritNode
 	sectionNode
 	mappingNode
-	valueNode
 	scalarNode
 	commentNode
 )
@@ -40,7 +39,7 @@ type parser struct {
 func newParser(b []byte) *parser {
 	p := parser{}
 	if !ini_parser_initialize(&p.parser) {
-		panic("failed to initialize INI emitter")
+		panic("failed to initialize INI parser")
 	}
 
 	if len(b) == 0 {
@@ -135,7 +134,20 @@ func (p *parser) clone_node(n *node) *node {
 	return thisNode
 }
 
-func (p *parser) merge_node(targetNode *node, sourceNode *node) {
+
+/**
+targetNode is: "hello": [1: "world"]
+sourceNode is: "hello": [1: [2: "world"]]
+overwrite result is:
+"hello": [1: [2: "world"]]
+no overwrite result is:
+"hello": [1: "world"]
+
+Specific scene:
+when inherit a section , the expect operation for the same node is "no overwrite"
+in the same section, the expect operation for the same node is "overwrite"
+*/
+func (p *parser) merge_node(targetNode *node, sourceNode *node, overwrite bool) {
 	if targetNode.kind == sourceNode.kind {
 		targetNodeCount := len(targetNode.children)
 		sourceNodeCount := len(sourceNode.children)
@@ -147,10 +159,12 @@ func (p *parser) merge_node(targetNode *node, sourceNode *node) {
 					nodeExist = true
 					if sourceNode.children[i+1].kind == targetNode.children[j+1].kind {
 						if len(sourceNode.children[i+1].children) > 0 && len(targetNode.children[j+1].children) > 0 {
-							p.merge_node(targetNode.children[j+1], p.clone_node(sourceNode.children[i+1]))
+							p.merge_node(targetNode.children[j+1], p.clone_node(sourceNode.children[i+1]), overwrite)
 						}
 					} else {
-						// discard different type of node
+                        if overwrite {
+                            targetNode.children[j + 1] = p.clone_node(sourceNode.children[i + 1])
+                        }
 					}
 					break
 				}
@@ -181,7 +195,7 @@ func (p *parser) document() *node {
 			for i := 0; i < len(p.doc.children); i += 2 {
 				if p.doc.children[i].kind == scalarNode && p.doc.children[i].value == nextNode.value {
 					sectionExists = true
-					p.merge_node(childNode, p.clone_node(p.doc.children[i+1]))
+					p.merge_node(childNode, p.clone_node(p.doc.children[i+1]), false)
 					break
 				}
 			}
@@ -204,17 +218,16 @@ func (p *parser) section() *node {
 	p.skip()
 	parentNode := thisNode
 	for p.event.typ != ini_SECTION_ENTRY_EVENT {
-		currentNode := p.parse()
-		if currentNode == nil {
+		currentNodeKey := p.parse()
+		if currentNodeKey == nil {
 			p.fail()
 		}
-		if currentNode.kind == scalarNode {
-			nextNode := p.parse()
-			// discard different type of node
+		if currentNodeKey.kind == scalarNode {
+			currentNodeValue := p.parse()
 			swapChildNodes := make([]*node, 0)
 			for i := 0; i < len(parentNode.children); i += 2 {
-				if parentNode.children[i].value == currentNode.value {
-					if parentNode.children[i+1].kind == nextNode.kind {
+				if parentNode.children[i].value == currentNodeKey.value {
+					if parentNode.children[i+1].kind == currentNodeValue.kind {
 						swapChildNodes = append(swapChildNodes, parentNode.children[i], parentNode.children[i+1])
 					}
 				} else {
@@ -228,23 +241,19 @@ func (p *parser) section() *node {
 				// condition:
 				// 1. current node type
 				// 2. current node value
-				if currentNode.kind == parentNode.children[i].kind && currentNode.value == parentNode.children[i].value {
+				if currentNodeKey.kind == scalarNode && parentNode.children[i].kind == scalarNode && currentNodeKey.value == parentNode.children[i].value {
 					nodeExist = true
-					// if child nodes type is different, overwrite it
-					if len(parentNode.children[i+1].children) > 0 {
-						for j := 0; j < len(parentNode.children[i+1].children); j += 2 {
-							if parentNode.children[i+1].children[j+1].kind != nextNode.kind {
-								parentNode.children[i+1] = nextNode
-							} else {
-								p.merge_node(parentNode.children[i+1], p.clone_node(nextNode))
-							}
-						}
+					// if current node value type is different, overwrite it
+					if parentNode.children[i+1].kind != currentNodeValue.kind {
+						parentNode.children[i+1] = p.clone_node(currentNodeValue)
+					} else {
+						p.merge_node(parentNode.children[i+1], p.clone_node(currentNodeValue), true)
 					}
 					break
 				}
 			}
 			if !nodeExist {
-				parentNode.children = append(parentNode.children, currentNode, nextNode)
+				parentNode.children = append(parentNode.children, currentNodeKey, currentNodeValue)
 			}
 		}
 		parentNode = thisNode
@@ -257,19 +266,19 @@ func (p *parser) mapping() *node {
 	// until next ini_SECTION_START_EVENT
 	p.skip()
 	parentNode := thisNode
-	currentNode := p.parse()
-	if currentNode == nil {
+	currentNodeKey := p.parse()
+	if currentNodeKey == nil {
 		p.fail()
 	}
-	if currentNode.kind == scalarNode {
-		nextNode := p.parse()
+	if currentNodeKey.kind == scalarNode {
+		currentNodeValue := p.parse()
 		nodeExist := false
 		i := 0
 		for ; i < len(parentNode.children); i += 2 {
 			// condition:
 			// 1. current node type
 			// 2. current node value
-			if currentNode.kind == parentNode.children[i].kind && currentNode.value == parentNode.children[i].value {
+			if currentNodeKey.kind == parentNode.children[i].kind && currentNodeKey.value == parentNode.children[i].value {
 				nodeExist = true
 				break
 			}
@@ -277,18 +286,18 @@ func (p *parser) mapping() *node {
 		if nodeExist {
 			if len(parentNode.children) > 0 {
 				// if node type is different, overwrite it
-				if parentNode.children[i+1].kind != nextNode.kind {
-					parentNode.children[i+1] = nextNode
+				if parentNode.children[i+1].kind != currentNodeValue.kind {
+					parentNode.children[i+1] = p.clone_node(currentNodeValue)
 				} else {
-					p.merge_node(parentNode.children[i+1], p.clone_node(nextNode))
+					p.merge_node(parentNode.children[i+1], p.clone_node(currentNodeValue), true)
 				}
 				parentNode = parentNode.children[i+1]
 			}
 		} else {
-			parentNode.children = append(parentNode.children, currentNode, nextNode)
+			parentNode.children = append(parentNode.children, currentNodeKey, currentNodeValue)
 		}
-		if nextNode.kind == mappingNode {
-			parentNode = nextNode
+		if currentNodeValue.kind == mappingNode {
+			parentNode = currentNodeValue
 		}
 	}
 	return thisNode
