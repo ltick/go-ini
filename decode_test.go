@@ -21,7 +21,7 @@ var unmarshalTests = []struct {
 		"",
 		&struct{}{},
 	}, {
-		"v= hi",
+		"v=hi",
 		map[string]string{"v": "hi"},
 	}, {
 		"v= hi",
@@ -125,7 +125,7 @@ var unmarshalTests = []struct {
 		"english= null",
 		map[string]interface{}{"english": nil},
 	}, {
-		"~= null key",
+		"~= null key ",
 		map[interface{}]string{nil: "null key"},
 	}, {
 		"empty=",
@@ -269,7 +269,7 @@ var unmarshalTests = []struct {
 		"'1'= '\"2\"'",
 		map[string]interface{}{"1": "\"2\""},
 	}, {
-		"v= 'B'",
+		"v = 'B' ",
 		map[string]interface{}{"v": "B"},
 	}, {
 		"hello.1= world_1",

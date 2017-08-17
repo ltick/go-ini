@@ -29,6 +29,7 @@ switcher_4 = Y
 switcher_5 = N
 flag = 1
 [Dev:common]
+string = "testing_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long"
 string_1.1 = "testing_dev"
 string_2.2 = "testing_dev"
 CaseInsensitive = true
@@ -53,6 +54,9 @@ CaseInsensitive = true
 
 	section_value, ok =  value["Dev"].(map[interface{}]interface{})
 	c.Assert(ok, Equals, true, Commentf("value: %#v", value["Dev"]))
+	string_value, ok :=  section_value["string"].(string)
+	c.Assert(ok, Equals, true, Commentf("value: %#v", section_value["string"]))
+	c.Assert(string_value, DeepEquals, "testing_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long")
 	string_1_value, ok =  section_value["string_1"].(map[interface{}]interface{})
 	c.Assert(ok, Equals, true, Commentf("value: %#v", section_value["string_1"]))
 	c.Assert(string_1_value[1], DeepEquals, "testing_dev")

@@ -63,6 +63,7 @@ func ini_parser_update_buffer(parser *ini_parser_t, length int) bool {
 	if parser.eof && parser.raw_buffer_pos == len(parser.raw_buffer) {
 		return true
 	}
+
 	// Return if the buffer contains enough characters.
 	if parser.unread >= length {
 		return true
@@ -81,6 +82,7 @@ func ini_parser_update_buffer(parser *ini_parser_t, length int) bool {
 
 	// Open the whole buffer for writing, and cut it before returning.
 	parser.buffer = parser.buffer[:cap(parser.buffer)]
+
 	// Fill the buffer until it has enough characters.
 	first := true
 	for parser.unread < length {
@@ -250,8 +252,10 @@ func ini_parser_update_buffer(parser *ini_parser_t, length int) bool {
 		if parser.eof {
 			parser.buffer[buffer_len] = 0
 			buffer_len++
+			parser.unread++
 			break
 		}
 	}
+	parser.buffer = parser.buffer[:buffer_len]
 	return true
 }
