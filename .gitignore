@@ -24,3 +24,5 @@ _testmain.go
 *.prof
 
 env.sh
+vendor
+Gopkg.lock
